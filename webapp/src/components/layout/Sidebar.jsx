@@ -1,9 +1,17 @@
 "use client";
 
+import {
+  BarChart3,
+  LayoutDashboard,
+  Settings,
+  Shield,
+  ShoppingCart,
+  Users,
+} from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
-import { LayoutDashboard, Users, ShoppingCart, Settings, BarChart3, Shield } from "lucide-react";
 
 const navigation = [
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
@@ -15,11 +23,29 @@ const navigation = [
 
 export default function Sidebar() {
   const pathname = usePathname();
+  const [user, setUser] = useState({ name: "Admin User", email: "admin@harness.io", avatar: "AD" });
+
+  useEffect(() => {
+    const userJson = localStorage.getItem("founder_user");
+    if (!userJson) {
+      window.location.href = "/login";
+      return;
+    }
+    try {
+      setUser(JSON.parse(userJson));
+    } catch (e) {
+      console.error(e);
+      window.location.href = "/login";
+    }
+  }, []);
 
   return (
     <div className="flex h-full w-64 flex-col border-r border-border bg-card text-card-foreground">
       <div className="flex h-16 items-center px-6 border-b border-border">
-        <Link href="/dashboard" className="flex items-center gap-2 font-semibold">
+        <Link
+          href="/dashboard"
+          className="flex items-center gap-2 font-semibold"
+        >
           <Shield className="size-5 text-primary" />
           <span className="text-base font-bold tracking-tight text-foreground uppercase">
             Founders Harness
@@ -37,7 +63,7 @@ export default function Sidebar() {
                 "group flex items-center gap-3 rounded px-3 py-2 text-sm font-medium transition-none",
                 isActive
                   ? "bg-primary text-primary-foreground font-semibold"
-                  : "text-muted-foreground hover:bg-secondary hover:text-foreground"
+                  : "text-muted-foreground hover:bg-secondary hover:text-foreground",
               )}
             >
               <item.icon className="size-4 flex-shrink-0" />
@@ -48,12 +74,14 @@ export default function Sidebar() {
       </nav>
       <div className="p-4 border-t border-border">
         <div className="flex items-center gap-3 rounded bg-secondary p-3">
-          <div className="size-8 rounded bg-background flex items-center justify-center font-bold text-foreground text-xs">
-            AD
+          <div className="size-8 rounded bg-background flex items-center justify-center font-bold text-foreground text-xs uppercase">
+            {user.avatar}
           </div>
           <div>
-            <p className="text-xs font-semibold text-foreground">Admin User</p>
-            <p className="text-[10px] text-muted-foreground">admin@harness.io</p>
+            <p className="text-xs font-semibold text-foreground truncate max-w-[140px]">{user.name}</p>
+            <p className="text-[10px] text-muted-foreground truncate max-w-[140px]">
+              {user.email}
+            </p>
           </div>
         </div>
       </div>

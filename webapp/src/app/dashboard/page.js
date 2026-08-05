@@ -1,7 +1,7 @@
-import StatCard from "@/components/dashboard/StatCard";
-import RevenueChart from "@/components/dashboard/RevenueChart";
+import { DollarSign, ShoppingBag, TrendingUp, Users } from "lucide-react";
 import RecentOrders from "@/components/dashboard/RecentOrders";
-import { DollarSign, Users, ShoppingBag, TrendingUp } from "lucide-react";
+import RevenueChart from "@/components/dashboard/RevenueChart";
+import StatCard from "@/components/dashboard/StatCard";
 
 export default function DashboardPage() {
   return (

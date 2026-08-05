@@ -36,7 +36,9 @@
   },
   "devDependencies": {
     "@biomejs/biome": "2.4.2",
+    "@playwright/test": "^1.62.1",
     "@tailwindcss/postcss": "^4",
+    "@types/node": "^26.1.2",
     "babel-plugin-react-compiler": "1.0.0",
     "tailwindcss": "^4"
   }

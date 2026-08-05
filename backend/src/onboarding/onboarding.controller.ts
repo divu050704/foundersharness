@@ -9,7 +9,6 @@ export class OnboardingController {
   @Post()
   @HttpCode(HttpStatus.CREATED)
   create(@Body() createOnboardingDto: CreateOnboardingDto) {
-    console.log(createOnboardingDto)
     return this.onboardingService.create(createOnboardingDto);
   }
 
