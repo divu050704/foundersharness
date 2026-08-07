@@ -1,12 +1,12 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { GroqService } from '../onboarding/groq.service';
+import { GeminiService } from '../onboarding/gemini.service';
 import { getAgentById } from './instances';
 
 @Injectable()
 export class AgentsService {
   private readonly logger = new Logger(AgentsService.name);
 
-  constructor(private readonly groqService: GroqService) {}
+  constructor(private readonly geminiService: GeminiService) {}
 
   async executeAgent(agentId: string, answers: any): Promise<string> {
     const agent = getAgentById(agentId);
@@ -19,7 +19,7 @@ export class AgentsService {
     const userPrompt = agent.generatePrompt(answers);
 
     this.logger.log(`Executing agent: ${agent.name} (${agent.id})`);
-    return this.groqService.generateCompletion(systemPrompt, userPrompt);
+    return this.geminiService.generateCompletion(systemPrompt, userPrompt);
   }
 }
 

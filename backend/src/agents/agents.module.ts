@@ -1,10 +1,10 @@
 import { Module } from '@nestjs/common';
 import { AgentsService } from './agents.service';
 import { AgentsController } from './agents.controller';
-import { GroqModule } from '../onboarding/groq.module';
+import { GeminiModule } from '../onboarding/gemini.module';
 
 @Module({
-  imports: [GroqModule],
+  imports: [GeminiModule],
   controllers: [AgentsController],
   providers: [AgentsService],
   exports: [AgentsService],

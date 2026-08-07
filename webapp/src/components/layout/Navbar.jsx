@@ -1,8 +1,19 @@
 "use client";
 
-import { Bell, Menu, Moon, Search, Sun } from "lucide-react";
+import {
+  Bell,
+  ChevronDown,
+  Loader2,
+  Menu,
+  Monitor,
+  Moon,
+  Power,
+  Search,
+  Sun,
+} from "lucide-react";
 import { useTheme } from "next-themes";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { toast } from "sonner";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
@@ -14,11 +25,36 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
+import { api } from "@/lib/api";
 
 export default function Navbar() {
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
-  const [user, setUser] = useState({ name: "Admin User", email: "admin@harness.io", avatar: "AD" });
+  const [user, setUser] = useState({
+    name: "Admin User",
+    email: "admin@harness.io",
+    avatar: "AD",
+  });
+
+  // Browser Session states
+  const [activeSession, setActiveSession] = useState("default");
+  const [helperConnected, setHelperConnected] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [browserSessions, setBrowserSessions] = useState([]);
+
+  const checkStatus = useCallback(async () => {
+    try {
+      const hookRes = await api.get("/social/hook-status");
+      setHelperConnected(hookRes.connected);
+
+      if (hookRes.connected) {
+        const sessionRes = await api.get("/social/active-session");
+        setActiveSession(sessionRes.activeSessionName || "default");
+      }
+    } catch (e) {
+      console.error("Failed to check session status in navbar:", e);
+    }
+  }, []);
 
   useEffect(() => {
     setMounted(true);
@@ -30,7 +66,67 @@ export default function Navbar() {
         console.error(e);
       }
     }
-  }, []);
+
+    checkStatus();
+    // Also fetch saved browser sessions
+    fetchBrowserSessions();
+    // Poll hook/session status every 8 seconds to stay in sync
+    const interval = setInterval(() => { checkStatus(); fetchBrowserSessions(); }, 8000);
+    return () => clearInterval(interval);
+  }, [checkStatus]);
+
+  const switchSession = async (sessionName) => {
+    if (sessionName === "close") {
+      setLoading(true);
+      try {
+        await api.post("/social/close-browser");
+        setActiveSession("default");
+        toast.success("Browser closed successfully.");
+      } catch (_err) {
+        toast.error("Failed to close browser.");
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
+
+    if (sessionName === "custom") {
+      const customName = prompt("Enter custom session profile name:", "");
+      if (!customName || !customName.trim()) return;
+      sessionName = customName.trim().replace(/[^a-zA-Z0-9_-]/g, "_");
+    }
+
+    setLoading(true);
+    try {
+      const res = await api.post("/social/launch-browser", { sessionName });
+      if (res.success) {
+        setActiveSession(sessionName);
+        toast.success(`Browser session switched to: ${sessionName}`);
+      } else {
+        toast.error(res.message || "Failed to launch session.");
+      }
+    } catch (_err) {
+      toast.error("Request failed. Is the browser helper online?");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Fetch custom browser session names from backend
+  const fetchBrowserSessions = async () => {
+    try {
+      const res = await api.get("/social/browser-sessions");
+      // Expecting an array of session names
+      if (Array.isArray(res)) {
+        setBrowserSessions(res);
+      } else {
+        setBrowserSessions([]);
+      }
+    } catch (e) {
+      console.error("Failed to fetch browser sessions", e);
+      setBrowserSessions([]);
+    }
+  };
 
   const handleLogout = () => {
     localStorage.removeItem("founder_user");
@@ -57,6 +153,95 @@ export default function Navbar() {
         </div>
       </div>
       <div className="flex items-center gap-3">
+        {/* Global Browser Session Switcher Dropdown */}
+        {mounted && (
+          <div className="mr-2">
+            {helperConnected ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={loading}
+                    className="flex items-center gap-1.5 h-8 px-2.5 text-xs bg-secondary/20 border-border hover:bg-secondary text-foreground font-medium rounded-lg"
+                  >
+                    {loading ? (
+                      <Loader2 className="size-3 animate-spin text-primary" />
+                    ) : (
+                      <Monitor className="size-3.5 text-primary animate-pulse" />
+                    )}
+                    <span className="max-w-[90px] truncate font-mono text-[11px] font-semibold text-muted-foreground hover:text-foreground">
+                      {activeSession}
+                    </span>
+                    <ChevronDown className="size-3 opacity-60" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent
+                  className="w-56 rounded border border-border bg-card shadow-none"
+                  align="end"
+                >
+                  <DropdownMenuLabel className="text-[10px] uppercase font-bold tracking-wider text-muted-foreground p-2">
+                    Browser Session Profiles
+                  </DropdownMenuLabel>
+                  <DropdownMenuSeparator className="bg-border" />
+                  {/* Default session */}
+                  <DropdownMenuItem
+                    onClick={() => switchSession("default")}
+                    className={`text-xs p-2 rounded cursor-pointer ${
+                      activeSession === "default"
+                        ? "bg-primary/10 text-primary font-semibold"
+                        : ""
+                    }`}
+                  >
+                    default
+                  </DropdownMenuItem>
+
+                  {/* Custom saved sessions */}
+                  {browserSessions
+                    .filter((s) => s !== "default")
+                    .map((session) => (
+                      <DropdownMenuItem
+                        key={session}
+                        onClick={() => switchSession(session)}
+                        className={`text-xs p-2 rounded cursor-pointer ${
+                          activeSession === session
+                            ? "bg-primary/10 text-primary font-semibold"
+                            : ""
+                        }`}
+                      >
+                        {session}
+                      </DropdownMenuItem>
+                    ))}
+
+                  {/* Launch custom profile */}
+                  <DropdownMenuItem
+                    onClick={() => switchSession("custom")}
+                    className="text-xs p-2 rounded cursor-pointer italic text-muted-foreground hover:text-foreground font-medium"
+                  >
+                    + Launch Custom Profile...
+                  </DropdownMenuItem>
+
+                  <DropdownMenuSeparator className="bg-border" />
+
+                  {/* Close browser */}
+                  <DropdownMenuItem
+                    onClick={() => switchSession("close")}
+                    className="text-xs text-rose-500 font-semibold p-2 rounded cursor-pointer hover:bg-rose-500/10 flex items-center gap-1.5"
+                  >
+                    <Power className="size-3.5" />
+                    Close Browser Window
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : (
+              <div className="flex items-center gap-1.5 px-2.5 h-8 rounded border border-border bg-secondary/10 text-muted-foreground/60 text-[10px] font-bold select-none cursor-not-allowed">
+                <Monitor className="size-3.5 opacity-40" />
+                <span>Helper Offline</span>
+              </div>
+            )}
+          </div>
+        )}
+
         {mounted && (
           <Button
             variant="ghost"
@@ -117,7 +302,7 @@ export default function Navbar() {
               Billing
             </DropdownMenuItem>
             <DropdownMenuSeparator className="bg-border" />
-            <DropdownMenuItem 
+            <DropdownMenuItem
               onClick={handleLogout}
               className="text-xs text-destructive font-semibold hover:bg-destructive/10 rounded p-2 cursor-pointer"
             >

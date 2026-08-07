@@ -7,6 +7,8 @@ import {
   Shield,
   ShoppingCart,
   Users,
+  Share2,
+  Brain,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -15,6 +17,8 @@ import { cn } from "@/lib/utils";
 
 const navigation = [
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+  { name: "Business Memory", href: "/dashboard/memory", icon: Brain },
+  { name: "Social Media", href: "/dashboard/social", icon: Share2 },
   { name: "Users", href: "/dashboard/users", icon: Users },
   { name: "Orders", href: "/dashboard/orders", icon: ShoppingCart },
   { name: "Analytics", href: "/dashboard/analytics", icon: BarChart3 },

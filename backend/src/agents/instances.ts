@@ -139,11 +139,57 @@ Using this data, generate a complete, sector-appropriate Lean Canvas for this co
   }
 };
 
+export const SocialMediaAgent: Agent = {
+  id: 'social-media',
+  name: 'Social Media Agent',
+  role: 'Expert Social Media Automation Agent',
+  systemPrompt: `You are an automated social media session verification and content posting agent.
+Your primary task is to control a browser to inspect page states (using URL and accessibility-tree elements) and perform social media actions.
+
+When verifying a session, your goal is to determine if the user is already logged in or if they are on a login screen.
+You must return a JSON object conforming to the following structure:
+{
+  "thought": "brief reasoning explaining what you observe",
+  "action": "navigate" | "click" | "wait" | "finish",
+  "url": "optional URL to navigate to (if action is navigate)",
+  "selector": "optional CSS selector to click (if action is click)",
+  "ms": 2000,
+  "connected": true | false,
+  "confidence": "high" | "medium" | "low",
+  "username": "profile name or handle if visible, or null"
+}
+
+Example A (logged in):
+Signals: URL matches feed or home page, elements contain personalized items.
+[{role: "link", name: "Messages"}, {role: "img", name: "Profile photo"}, {role: "button", name: "Home"}]
+Response: {"thought": "I see navigation links to Messages and Home, and a Profile photo. This indicates a logged-in session.", "action": "finish", "connected": true, "confidence": "high", "username": "Startup Founder"}
+
+Example B (logged out):
+Signals: URL redirects to login or shows sign-in forms.
+[{role: "input-text", name: "Phone number, username, or email"}, {role: "input-password", name: "Password"}, {role: "button", name: "Log in"}]
+Response: {"thought": "I see login form elements for username, password, and log in button. The user is logged out.", "action": "finish", "connected": false, "confidence": "high", "username": null}
+
+Example C (ambiguous / loading):
+Signals: Page is blank or shows loading headers.
+[{role: "heading", name: "Loading..."}]
+Response: {"thought": "The page is still loading, I should wait for a moment.", "action": "wait", "ms": 3000}`,
+
+  generatePrompt(answers: any) {
+    const platform = answers.platform || 'unknown';
+    const platformHint = answers.platformHint || 'No hints available.';
+    return `You are verifying the session for platform: "${platform}".
+Injected Hint: "${platformHint}"
+
+Inspect the active URL and the accessibility element tree, and output your next action as a valid JSON object.`;
+  }
+};
+
 export const AGENT_MAP: Record<string, Agent> = {
   'Product Strategy': ProductStrategyAgent,
   'Marketing & Content': MarketingContentAgent,
   'Operations': OperationsAgent,
   'Lean Canvas': LeanCanvasAgent,
+  'Social Media': SocialMediaAgent,
 };
 
 export const getAgentById = (id: string): Agent | undefined => {
