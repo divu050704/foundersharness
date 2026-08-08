@@ -105,7 +105,7 @@ export class DeviceHookService implements OnModuleInit, OnModuleDestroy {
     return this.isConnected && this.ws?.readyState === WebSocket.OPEN;
   }
 
-  async sendCommand(action: string, params: Record<string, any> = {}, timeoutMs = 30000): Promise<any> {
+  async sendCommand(action: string, params: Record<string, any> = {}, timeoutMs = 40000): Promise<any> {
     return new Promise((resolve, reject) => {
       if (!this.isHookConnected()) {
         return reject(

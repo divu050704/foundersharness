@@ -19,8 +19,40 @@ const PLATFORM_HINTS: Record<string, string> = {
 };
 
 const SCRAPE_PLATFORM_HINTS: Record<string, string> = {
-  linkedin: `You are on the user's LinkedIn "Recent activity" page. Extract the text content of up to 5 of the user's most recent original posts (skip pure reposts/comments if you can tell the difference). If posts haven't loaded yet, use "wait". If you're not on the right page, "navigate" to "https://www.linkedin.com/in/me/recent-activity/all/". Once you can read enough post text from the accessibility tree, call "finish".`,
-  instagram: `You need to find the user's own Instagram profile and extract their bio plus captions from up to 5 recent posts. Start from the Instagram home page and locate the link/avatar for the user's own profile (usually the "Profile" nav item or the account avatar, linking to "/<username>/"), then "navigate" there. Once on the profile page, read the bio text near the top and the caption text for visible posts. To read post captions, you must click a post (e.g. click a link matching a[href^='/p/']). After reading a post, you must go back to the profile page (either by closing the modal, clicking the back button, or navigating back to the profile URL). When selecting a post to click, check the "Clicked Selectors/Links" history. You MUST select a DIFFERENT post selector/href than the ones you have clicked in previous steps to avoid opening the same post repeatedly.`,
+  linkedin: `# SEQUENTIAL SCRAPING PIPELINE (Execute line-by-line like Python code):
+# -------------------------------------------------------------
+# step1_navigate_to_recent_activity()
+#     # If you are not on the right page, "navigate" to "https://www.linkedin.com/in/me/recent-activity/all/".
+#
+# step2_wait_for_load()
+#     # If posts haven't loaded yet, use "wait" action.
+#
+# step3_extract_posts()
+#     # Extract the text content of 5 to 7 of the user's most recent original posts (skip pure reposts/comments).
+#
+# step4_finish()
+#     # Once you can read enough post text from the accessibility tree, call "finish" action with the "posts" array.`,
+  instagram: `# SEQUENTIAL SCRAPING PIPELINE (Execute line-by-line like Python code):
+# -------------------------------------------------------------
+# step1_navigate_to_profile()
+#     # Start from the Instagram home page, locate the link/avatar for the user's own profile (usually the "Profile" nav item or the account avatar linking to "/<username>/"), then "navigate"/click there.
+#
+# step2_scrape_bio()
+#     # Once on the profile page, first extract the user's bio text near the top of the profile page.
+#     # Save this bio in the "bio" field of your action JSON.
+#     # DO NOT call the "finish" action after this step. You must immediately proceed to step3_scrape_posts_sequentially() by executing a "click" action on a post.
+#
+# step3_scrape_posts_sequentially()
+#     # For post in visible posts:
+#     #     # 1. You MUST be on the profile page (URL ends with '/<username>/') to click a post.
+#     #     # 2. Pick a post link whose post ID is NOT in ALREADY_OPENED_POST_IDS.
+#     #     # 3. click_post(selector) -> Opens the post modal/page.
+#     #     # 4. extract_caption() -> Read the caption and save/append it to "posts" array in the action JSON.
+#     #     # 5. return_to_profile() -> You MUST go back to the profile page (e.g. click "Close" button or navigate back to the profile URL) BEFORE attempting to click the next post. Do not try to click another post while a post details view is open.
+#     #     # Repeat until you have scraped 5 to 7 posts.
+#
+# step4_finish()
+#     # Call "finish" action with all accumulated "posts" (between 5 and 7) and the "bio".`,
 };
 
 @Injectable()
@@ -157,7 +189,7 @@ ${JSON.stringify(state.elements, null, 2)}`;
 
   /** Shared navigate/click/wait executor used by the browser-driving agent loops. */
   private async executeBrowserAction(action: any, opts: { navigateTimeoutMs?: number; clickTimeoutMs?: number } = {}) {
-    const { navigateTimeoutMs = 15000, clickTimeoutMs = 5000 } = opts;
+    const { navigateTimeoutMs = 15000, clickTimeoutMs = 35000 } = opts;
 
     if (action.action === 'navigate') {
       if (!action.url) throw new Error('"url" is required for navigate action.');
@@ -233,7 +265,7 @@ ${JSON.stringify(state.elements, null, 2)}`;
           }
           return { accept: true };
         },
-        executeAction: (action) => this.executeBrowserAction(action, { navigateTimeoutMs: 15000, clickTimeoutMs: 5000 }),
+        executeAction: (action) => this.executeBrowserAction(action, { navigateTimeoutMs: 15000, clickTimeoutMs: 35000 }),
       });
 
       return {
@@ -301,7 +333,7 @@ Rules:
         getState: () => this.getBrowserState(),
         buildUserPrompt: (step, maxSteps, state, feedback) =>
           this.buildBrowserUserPrompt('', step, maxSteps, state, feedback),
-        executeAction: (action) => this.executeBrowserAction(action, { navigateTimeoutMs: 15000, clickTimeoutMs: 10000 }),
+        executeAction: (action) => this.executeBrowserAction(action, { navigateTimeoutMs: 15000, clickTimeoutMs: 35000 }),
       });
 
       return {
@@ -337,7 +369,7 @@ Rules:
       await this.sleep(3000);
 
       const hint = SCRAPE_PLATFORM_HINTS[platform];
-      const systemPrompt = `You are a browser automation agent whose job is to scrape past ${platform} content (atleast 2 posts) for the current logged-in user.
+      const systemPrompt = `You are a browser automation agent whose job is to scrape past ${platform} content (5 to 7 posts) for the current logged-in user.
 ${hint}
 
 You can execute the following JSON actions:
@@ -348,18 +380,19 @@ You can execute the following JSON actions:
 
 Rules:
 - Respond ONLY with a valid JSON object matching one of the actions above.
-- Avoid Repeated Clicks: Inspect the "Clicked Selectors/Links" history provided in your prompt. DO NOT click the exact same selector/element again. Choose a different selector/element for the second post.
+- Avoid Repeated Clicks: Inspect the CLICKED_SELECTORS_OR_LINKS array variable provided in your prompt checkpoint state. DO NOT click the exact same selector/element again. Choose a different selector/element for subsequent posts.
 - Prefer reading text directly from the accessibility elements tree over clicking whenever possible.
-- Only call "finish" once you have extracted real post text (never fabricate posts). If truly nothing is found after exploring, finish with an empty "posts" array.`;
+- DO NOT call "finish" early. You must scrape at least 5 posts (up to 7 posts) before calling "finish". You are only allowed to finish with 0 posts if there are absolutely no post links present on the profile page after navigating.
+- Only call "finish" once you have completed the sequential post scraping pipeline. Never call "finish" immediately after step2_scrape_bio().`;
 
       const result = await this.geminiService.runAgentLoop({
         label: `scrape-posts:${platform}`,
         systemPrompt,
-        maxSteps: 10,
+        maxSteps: 20,
         getState: () => this.getBrowserState(),
         buildUserPrompt: (step, maxSteps, state, feedback) =>
           this.buildBrowserUserPrompt('', step, maxSteps, state, feedback),
-        executeAction: (action) => this.executeBrowserAction(action, { navigateTimeoutMs: 15000, clickTimeoutMs: 8000 }),
+        executeAction: (action) => this.executeBrowserAction(action, { navigateTimeoutMs: 15000, clickTimeoutMs: 35000 }),
       });
       console.log(result)
       const posts = Array.isArray(result.posts)
@@ -393,6 +426,67 @@ Rules:
   //     ];
   //   }
   // }
+
+  private cleanAndParseJson(raw: string): any {
+    let clean = raw.trim();
+    const markdownRegex = /```(?:json)?\s*([\s\S]*?)\s*```/i;
+    const match = clean.match(markdownRegex);
+    if (match) {
+      clean = match[1].trim();
+    }
+
+    try {
+      return JSON.parse(clean);
+    } catch (directError) {
+      let inString = false;
+      let escape = false;
+      let braceCount = 0;
+      let startIndex = -1;
+      let endIndex = -1;
+      const firstChar = clean.match(/[\[{]/);
+      
+      if (firstChar) {
+        const targetOpen = firstChar[0];
+        const targetClose = targetOpen === '[' ? ']' : '}';
+        
+        for (let i = 0; i < clean.length; i++) {
+          const char = clean[i];
+          if (char === '\\') {
+            escape = !escape;
+            continue;
+          }
+          if (char === '"' && !escape) {
+            inString = !inString;
+          }
+          escape = false;
+
+          if (!inString) {
+            if (char === targetOpen) {
+              if (braceCount === 0) {
+                startIndex = i;
+              }
+              braceCount++;
+            } else if (char === targetClose) {
+              braceCount--;
+              if (braceCount === 0) {
+                endIndex = i;
+                break;
+              }
+            }
+          }
+        }
+
+        if (startIndex !== -1 && endIndex !== -1) {
+          try {
+            return JSON.parse(clean.substring(startIndex, endIndex + 1));
+          } catch (subError) {
+            // ignore and throw directError
+          }
+        }
+      }
+      throw directError;
+    }
+  }
 
   /**
    * Generates a 7-day social media post calendar using the Context Builder and past posts
@@ -448,14 +542,7 @@ Your output MUST be a valid JSON array of objects with exactly this structure (n
         { type: 'json_object' },
       );
 
-      let cleanJson = response.trim();
-      const firstBrace = cleanJson.indexOf('[');
-      const lastBrace = cleanJson.lastIndexOf(']');
-      if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
-        cleanJson = cleanJson.substring(firstBrace, lastBrace + 1);
-      }
-
-      const calendar = JSON.parse(cleanJson);
+      const calendar = this.cleanAndParseJson(response);
       if (!Array.isArray(calendar)) {
         throw new Error('LLM did not return an array');
       }

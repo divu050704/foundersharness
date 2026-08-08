@@ -171,7 +171,14 @@ export class GroqService {
 
       this.logger.log(`[${label}] Step ${step}/${maxSteps}: requesting next action...`);
       const responseText = await this.generateCompletion(systemPrompt, userPrompt, responseFormat);
-      const agentAction = JSON.parse(responseText);
+      
+      let cleanedResponse = responseText.trim();
+      const mdMatch = cleanedResponse.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
+      if (mdMatch) {
+        cleanedResponse = mdMatch[1].trim();
+      }
+      
+      const agentAction = JSON.parse(cleanedResponse);
 
       this.logger.log(`[${label}] Step ${step}: thought=${agentAction.thought || 'None'} action=${agentAction.action}`);
 

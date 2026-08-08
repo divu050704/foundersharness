@@ -85,8 +85,8 @@ export class GeminiService {
   }
 
   async generateCompletion(
-    systemPrompt: string,
-    userPrompt: string,
+    systemPromptOrMessages: string | any[],
+    userPrompt?: string | any,
     responseFormat?: { type: 'json_object' },
   ): Promise<string> {
     if (!this.apiKey) {
@@ -112,16 +112,23 @@ export class GeminiService {
         this.logger.log(`Attempting completion with model: ${model}`);
         const payload: any = {
           model: model,
-          messages: [
-            { role: 'system', content: systemPrompt },
-            { role: 'user', content: userPrompt },
-          ],
+          messages: Array.isArray(systemPromptOrMessages)
+            ? systemPromptOrMessages
+            : [
+                { role: 'system', content: systemPromptOrMessages },
+                { role: 'user', content: userPrompt },
+              ],
           temperature: 0.2,
           max_tokens: 8192,
         };
+        console.log(payload)
 
-        if (responseFormat) {
-          payload.response_format = responseFormat;
+        const actualFormat = Array.isArray(systemPromptOrMessages)
+          ? (userPrompt as { type: 'json_object' })
+          : responseFormat;
+
+        if (actualFormat) {
+          payload.response_format = actualFormat;
         }
 
         const response = await fetch(this.apiUrl, {
@@ -212,6 +219,7 @@ export class GeminiService {
     const visitedUrls: string[] = [];
     const clickedSelectors: string[] = [];
     const accumulatedData: any = {};
+    const messages: any[] = [];
 
     for (let step = 1; step <= maxSteps; step++) {
       const state = await getState();
@@ -222,19 +230,84 @@ export class GeminiService {
         }
       }
 
-      let userPrompt = buildUserPrompt(step, maxSteps, state, executionFeedback);
+      let userContent = '';
+      if (step === 1) {
+        userContent += `[SYSTEM INSTRUCTIONS]:\n${systemPrompt}\n\n`;
+      }
+      userContent += buildUserPrompt(step, maxSteps, state, executionFeedback);
       executionFeedback = null;
 
+      // Extract post IDs and determine the active step in the pipeline
+      const openedPostIds: string[] = [];
+      for (const url of visitedUrls) {
+        const match = url.match(/\/p\/([a-zA-Z0-9_-]+)/);
+        if (match && !openedPostIds.includes(match[1])) {
+          openedPostIds.push(match[1]);
+        }
+      }
+
+      const postCount = Array.isArray(accumulatedData.posts) ? accumulatedData.posts.length : 0;
+      const hasBio = typeof accumulatedData.bio === 'string' && accumulatedData.bio.trim().length > 0;
+
+      let currentPipelineStep = 'Executing sequential scraping logic...';
+      if (label?.includes('instagram')) {
+        const hasInstagramProfileVisited = visitedUrls.some(u => {
+          const path = u.replace('https://www.instagram.com', '').replace('https://instagram.com', '');
+          return path.length > 1 && !path.startsWith('/p/') && !path.startsWith('/direct/') && !path.startsWith('/reels/') && !path.startsWith('/explore/');
+        });
+
+        if (!hasInstagramProfileVisited) {
+          currentPipelineStep = 'step1_navigate_to_profile()  # Target: Navigate to user profile page';
+        } else if (!hasBio) {
+          currentPipelineStep = 'step2_scrape_bio()           # Target: Extract and save the user bio';
+        } else if (postCount < 5) {
+          currentPipelineStep = `step3_scrape_posts_sequentially()  # Target: Click and scrape Post #${postCount + 1} (already saved ${postCount} posts)`;
+        } else {
+          currentPipelineStep = 'step4_finish()               # Target: Scraped 5 posts successfully, call finish';
+        }
+      } else if (label?.includes('linkedin')) {
+        const isOnLinkedInActivity = visitedUrls.some(u => u.includes('/recent-activity/'));
+        if (!isOnLinkedInActivity) {
+          currentPipelineStep = 'step1_navigate_to_recent_activity()  # Target: Navigate to recent activity page';
+        } else if (postCount < 5) {
+          currentPipelineStep = `step3_extract_posts()  # Target: Scrape Post #${postCount + 1}`;
+        } else {
+          currentPipelineStep = 'step4_finish()        # Target: Scraped all posts, call finish';
+        }
+      }
+
       // Inject guidelines about visited URL stack, clicked selectors, and progressive data accumulation
-      userPrompt += `\n\n[Navigation & Scraping Guidelines]:
-- Visited URLs in this loop: ${visitedUrls.length > 0 ? visitedUrls.join(', ') : 'None'}. Do NOT navigate to the same URL again.
-- Clicked Selectors/Links: ${clickedSelectors.length > 0 ? clickedSelectors.join(', ') : 'None'}. DO NOT click these selectors or links again. You must choose a DIFFERENT post selector or element to scrape other posts.
-- Progressive Data Saving: You can save extracted data progressively! Include data fields (e.g. "posts": ["..."], "bio": "...") in ANY action (even navigate, click, or wait). The system accumulates them automatically.
-- Data Saved So Far: ${JSON.stringify(accumulatedData)}. You do not need to re-extract or re-send these items.`;
+      userContent += `\n\n# --- SCRAPING CHECKPOINT SYSTEM STATE (Python Variables) ---
+# Current active pipeline step to execute:
+>>> ${currentPipelineStep}
+
+# State Variables:
+CLICKED_SELECTORS_OR_LINKS = ${JSON.stringify(clickedSelectors)}
+VISITED_URLS = ${JSON.stringify(visitedUrls)}
+ALREADY_OPENED_POST_IDS = ${JSON.stringify(openedPostIds)}
+DATA_SAVED_SO_FAR = ${JSON.stringify(accumulatedData)}
+
+# Guidelines:
+# - Compare your current position and targets with ALREADY_OPENED_POST_IDS.
+# - Do NOT click any post selectors or links containing a post ID that is in ALREADY_OPENED_POST_IDS (e.g. if 'DP_imdqkyCI' is in the list, avoid clicking selectors like 'a[href*="DP_imdqkyCI"]').
+# - You must choose a post link representing a DIFFERENT post ID to scrape other posts.
+# - You can save extracted data progressively! Include data fields (e.g., "posts": ["..."], "bio": "...") in ANY action (navigate, click, wait). The system automatically merges them into DATA_SAVED_SO_FAR.`;
+
+      messages.push({ role: 'user', content: userContent });
 
       this.logger.log(`[${label}] Step ${step}/${maxSteps}: requesting next action...`);
-      const responseText = await this.generateCompletion(systemPrompt, userPrompt, responseFormat);
-      const agentAction = JSON.parse(responseText);
+      const responseText = await this.generateCompletion(messages, responseFormat);
+      
+      let cleanedResponse = responseText.trim();
+      const mdMatch = cleanedResponse.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
+      if (mdMatch) {
+        cleanedResponse = mdMatch[1].trim();
+      }
+      
+      const agentAction = JSON.parse(cleanedResponse);
+
+      // Save the LLM's response as system role as requested
+      messages.push({ role: 'system', content: responseText });
 
       // Accumulate any data returned in this step
       this.accumulateActionData(accumulatedData, agentAction);

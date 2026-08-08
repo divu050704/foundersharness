@@ -677,9 +677,16 @@ namespace foundersharness
 
                         foreach (var targetSel in selectorFallbacks)
                         {
-                            Log($"Clicking {targetSel}");
                             try
                             {
+                                // Check if element is present to avoid waiting for Playwright click timeout
+                                var count = await _activePage.Locator(targetSel).CountAsync();
+                                if (count == 0)
+                                {
+                                    continue;
+                                }
+
+                                Log($"Clicking {targetSel}");
                                 // First attempt: Playwright standard click with a short timeout
                                 await _activePage.ClickAsync(targetSel, new PageClickOptions { Force = force, Timeout = 2000 });
                                 Log($"Successfully clicked selector via Playwright: {targetSel}");
@@ -693,7 +700,7 @@ namespace foundersharness
                                 try
                                 {
                                     Log($"Clicking {targetSel} (JS Fallback)");
-                                    await _activePage.Locator(targetSel).EvaluateAsync("el => (el as HTMLElement).click()");
+                                    await _activePage.Locator(targetSel).First.EvaluateAsync("el => (el as HTMLElement).click()");
                                     Log($"Successfully clicked selector via JS Fallback: {targetSel}");
                                     clickedSuccessfully = true;
                                     break;
@@ -734,7 +741,6 @@ namespace foundersharness
 
                     case "content":
                         string snapshot = await _activePage.AriaSnapshotAsync();
-                        Log(snapshot);
                         return CreateResponseJson(id, "success", snapshot);
 
                     case "get_text":
