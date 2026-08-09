@@ -149,4 +149,54 @@ describe('GeminiService - runAgentLoop Isolation Tests', () => {
     expect(errorThrown.message).toContain('Agent loop aborted early: loop detected');
     expect(feedbackSeen).toContain('STUCK STATE DETECTED!');
   });
+
+  it('should use custom pipeline stages when provided', async () => {
+    const generateSpy = jest.spyOn(service, 'generateCompletion');
+    generateSpy.mockResolvedValueOnce(
+      JSON.stringify({ action: 'click', selector: 'button', addedToCart: true })
+    ).mockResolvedValueOnce(
+      JSON.stringify({ action: 'finish', success: true })
+    );
+
+    const executeAction = jest.fn().mockResolvedValue({ feedback: 'clicked' });
+    const getState = jest.fn().mockResolvedValue({ url: 'https://myshop.com/products/1', elements: '' });
+
+    const pipelineStages = [
+      {
+        stage: 'step1_add_to_cart',
+        isActive: (ctx: any) => !ctx.accumulatedData.addedToCart,
+        instruction: () => 'Find the "Add to Cart" button and click it.'
+      },
+      {
+        stage: 'step2_finish',
+        isActive: (ctx: any) => !!ctx.accumulatedData.addedToCart,
+        instruction: () => 'Everything is done. Call finish.'
+      }
+    ];
+
+    const result = await service.runAgentLoop({
+      label: 'checkout-flow',
+      systemPrompt: 'Test prompt',
+      pipelineStages,
+      buildUserPrompt: () => 'custom-prefix',
+      getState,
+      executeAction,
+      maxAttempts: 3,
+    });
+
+    expect(result.addedToCart).toBe(true);
+    expect(result.success).toBe(true);
+    expect(executeAction).toHaveBeenCalledTimes(1);
+
+    expect(generateSpy).toHaveBeenCalledTimes(2);
+    const firstCallArgs = generateSpy.mock.calls[0][0] as any[];
+    
+    const firstUserMsg = firstCallArgs[0].content;
+    const secondUserMsg = firstCallArgs[2].content;
+
+    expect(firstUserMsg).toContain('CURRENT TASK STAGE: step1_add_to_cart');
+    expect(firstUserMsg).toContain('Find the "Add to Cart" button and click it.');
+    expect(secondUserMsg).toContain('CURRENT TASK STAGE: step2_finish');
+    expect(secondUserMsg).toContain('Everything is done. Call finish.');
+  });
 });

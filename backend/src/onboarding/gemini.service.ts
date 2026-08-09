@@ -2,6 +2,19 @@ import { Injectable, Logger } from '@nestjs/common';
 import * as fs from 'fs';
 import * as path from 'path';
 
+export interface PipelineContext {
+  visitedUrls: string[];
+  clickedSelectors: string[];
+  accumulatedData: any;
+  state: any;
+}
+
+export interface PipelineStage {
+  stage: string;                    // e.g. "step2_scrape_bio"
+  isActive: (ctx: PipelineContext) => boolean;  // is this the current stage?
+  instruction: (ctx: PipelineContext) => string; // what to tell the model
+}
+
 export interface AgentActionResult {
   feedback?: string;
 }
@@ -29,6 +42,8 @@ export interface AgentLoopOptions {
   responseFormat?: { type: 'json_object' };
   /** Optional label used in log lines to distinguish concurrent/different agent loops. */
   label?: string;
+  /** Ordered list of pipeline stages to evaluate sequentially. */
+  pipelineStages?: PipelineStage[];
 }
 
 @Injectable()
@@ -277,73 +292,81 @@ Directive: You must change your approach. If you returned an invalid array, retu
         instruction: 'Execute the browser automation task step by step.'
       };
 
-      if (label?.includes('instagram')) {
-        if (label?.includes('scrape-posts')) {
-          const hasInstagramProfileVisited = visitedUrls.some(u => {
-            const path = u.replace('https://www.instagram.com', '').replace('https://instagram.com', '');
-            return path.length > 1 && !path.startsWith('/p/') && !path.startsWith('/direct/') && !path.startsWith('/reels/') && !path.startsWith('/explore/');
-          });
+      if (options.pipelineStages && options.pipelineStages.length > 0) {
+        const ctx: PipelineContext = { visitedUrls, clickedSelectors, accumulatedData, state };
+        const active = options.pipelineStages.find(s => s.isActive(ctx));
+        if (active) {
+          currentPipelineStep = { stage: active.stage, instruction: active.instruction(ctx) };
+        }
+      } else {
+        if (label?.includes('instagram')) {
+          if (label?.includes('scrape-posts')) {
+            const hasInstagramProfileVisited = visitedUrls.some(u => {
+              const path = u.replace('https://www.instagram.com', '').replace('https://instagram.com', '');
+              return path.length > 1 && !path.startsWith('/p/') && !path.startsWith('/direct/') && !path.startsWith('/reels/') && !path.startsWith('/explore/');
+            });
 
-          if (!hasInstagramProfileVisited) {
-            currentPipelineStep = {
-              stage: 'step1_navigate_to_profile',
-              instruction: 'Start from the Instagram home page, locate the link/avatar for the user\'s own profile (usually the "Profile" nav item or the account avatar linking to "/<username>/"), then click or navigate to it.'
-            };
-          } else if (!hasBio) {
-            currentPipelineStep = {
-              stage: 'step2_scrape_bio',
-              instruction: 'Now on the profile page, first extract the user\'s bio text near the top of the profile page. Save this bio in the "bio" field of your action JSON. DO NOT call "finish" yet. Proceed to scrape posts.'
-            };
-          } else if (postCount < 5) {
-            currentPipelineStep = {
-              stage: 'step3_scrape_posts_sequentially',
-              instruction: `Currently saved ${postCount} posts. Target: Click and scrape Post #${postCount + 1}. Remember:
+            if (!hasInstagramProfileVisited) {
+              currentPipelineStep = {
+                stage: 'step1_navigate_to_profile',
+                instruction: 'Start from the Instagram home page, locate the link/avatar for the user\'s own profile (usually the "Profile" nav item or the account avatar linking to "/<username>/"), then click or navigate to it.'
+              };
+            } else if (!hasBio) {
+              currentPipelineStep = {
+                stage: 'step2_scrape_bio',
+                instruction: 'Now on the profile page, first extract the user\'s bio text near the top of the profile page. Save this bio in the "bio" field of your action JSON. DO NOT call "finish" yet. Proceed to scrape posts.'
+              };
+            } else if (postCount < 5) {
+              currentPipelineStep = {
+                stage: 'step3_scrape_posts_sequentially',
+                instruction: `Currently saved ${postCount} posts. Target: Click and scrape Post #${postCount + 1}. Remember:
 1. You MUST be on the profile page (URL ends with '/<username>/') to click a post.
 2. Click a post whose ID isn't in ALREADY_OPENED_POST_IDS (e.g. if 'DP_imdqkyCI' is in the list, avoid clicking selectors like 'a[href*="DP_imdqkyCI"]').
 3. Once the post opens, read the caption and save/append it to "posts" array in the action JSON.
 4. You MUST close the post or navigate back to the profile page before attempting to click the next post. Do not click another post from details view.`
-            };
-          } else {
+              };
+            } else {
+              currentPipelineStep = {
+                stage: 'step4_finish',
+                instruction: `Scraped ${postCount} posts successfully (at least 5 required). Call the "finish" action with the accumulated "posts" and "bio".`
+              };
+            }
+          } else if (label?.includes('verify-session')) {
             currentPipelineStep = {
-              stage: 'step4_finish',
-              instruction: `Scraped ${postCount} posts successfully (at least 5 required). Call the "finish" action with the accumulated "posts" and "bio".`
+              stage: 'verify_instagram_session',
+              instruction: 'Analyze the URL and accessibility tree to check if logged in. Look for "Messages" or profile links. If logged out, identify login inputs. Return "finish" with connected: true/false.'
             };
           }
-        } else if (label?.includes('verify-session')) {
-          currentPipelineStep = {
-            stage: 'verify_instagram_session',
-            instruction: 'Analyze the URL and accessibility tree to check if logged in. Look for "Messages" or profile links. If logged out, identify login inputs. Return "finish" with connected: true/false.'
-          };
-        }
-      } else if (label?.includes('linkedin')) {
-        if (label?.includes('scrape-posts')) {
-          const isOnLinkedInActivity = visitedUrls.some(u => u.includes('/recent-activity/'));
-          if (!isOnLinkedInActivity) {
+        } else if (label?.includes('linkedin')) {
+          if (label?.includes('scrape-posts')) {
+            const isOnLinkedInActivity = visitedUrls.some(u => u.includes('/recent-activity/'));
+            if (!isOnLinkedInActivity) {
+              currentPipelineStep = {
+                stage: 'step1_navigate_to_recent_activity',
+                instruction: 'If you are not on the recent activity page, navigate to "https://www.linkedin.com/in/me/recent-activity/all/".'
+              };
+            } else if (postCount < 5) {
+              currentPipelineStep = {
+                stage: 'step3_extract_posts',
+                instruction: `Currently saved ${postCount} posts. Target: Scrape Post #${postCount + 1}. Extract the text content of the user\'s most recent original posts (skip pure reposts/comments) and append to the "posts" array.`
+              };
+            } else {
+              currentPipelineStep = {
+                stage: 'step4_finish',
+                instruction: `Scraped ${postCount} posts successfully. Call the "finish" action with the accumulated "posts" array.`
+              };
+            }
+          } else if (label?.includes('verify-session')) {
             currentPipelineStep = {
-              stage: 'step1_navigate_to_recent_activity',
-              instruction: 'If you are not on the recent activity page, navigate to "https://www.linkedin.com/in/me/recent-activity/all/".'
+              stage: 'verify_linkedin_session',
+              instruction: 'Analyze the URL and accessibility tree to check if logged in. Look for nav links ("Home", "My Network") or sign-in buttons. Return "finish" with connected: true/false.'
             };
-          } else if (postCount < 5) {
+          } else if (label?.includes('post-content')) {
             currentPipelineStep = {
-              stage: 'step3_extract_posts',
-              instruction: `Currently saved ${postCount} posts. Target: Scrape Post #${postCount + 1}. Extract the text content of the user\'s most recent original posts (skip pure reposts/comments) and append to the "posts" array.`
-            };
-          } else {
-            currentPipelineStep = {
-              stage: 'step4_finish',
-              instruction: `Scraped ${postCount} posts successfully. Call the "finish" action with the accumulated "posts" array.`
+              stage: 'post_content_linkedin',
+              instruction: 'Locate the "Start a post" button, open the editor modal, fill the text box with the content to post, click publish, and verify publication. Return "finish" with success: true once complete.'
             };
           }
-        } else if (label?.includes('verify-session')) {
-          currentPipelineStep = {
-            stage: 'verify_linkedin_session',
-            instruction: 'Analyze the URL and accessibility tree to check if logged in. Look for nav links ("Home", "My Network") or sign-in buttons. Return "finish" with connected: true/false.'
-          };
-        } else if (label?.includes('post-content')) {
-          currentPipelineStep = {
-            stage: 'post_content_linkedin',
-            instruction: 'Locate the "Start a post" button, open the editor modal, fill the text box with the content to post, click publish, and verify publication. Return "finish" with success: true once complete.'
-          };
         }
       }
 
