@@ -15,7 +15,7 @@ export interface AgentLoopOptions {
   /** System prompt sent to the model for every step of this loop. */
   systemPrompt: string;
   /** Builds the user-turn prompt for a given step from the latest state + feedback. */
-  buildUserPrompt: (step: number, maxSteps: number, state: any, feedback: string | null) => string;
+  buildUserPrompt: (attempt: number, maxAttempts: number, state: any, feedback: string | null) => string;
   /** Fetches whatever "world state" (e.g. browser state) should be shown to the model each step. */
   getState: () => Promise<any>;
   /** Executes a non-"finish" action returned by the model. Throw to signal failure (fed back as feedback). */
@@ -24,8 +24,8 @@ export interface AgentLoopOptions {
    * Optional gate on "finish" actions - e.g. to reject low-confidence finishes and retry.
    * If omitted, any "finish" action is accepted immediately.
    */
-  handleFinish?: (action: any, step: number, maxSteps: number) => Promise<AgentFinishVerdict>;
-  maxSteps?: number;
+  handleFinish?: (action: any, attempt: number, maxAttempts: number) => Promise<AgentFinishVerdict>;
+  maxAttempts?: number;
   responseFormat?: { type: 'json_object' };
   /** Optional label used in log lines to distinguish concurrent/different agent loops. */
   label?: string;
@@ -163,6 +163,9 @@ export class GeminiService {
   }
 
   private accumulateActionData(target: any, source: any) {
+    if (!source || typeof source !== 'object' || Array.isArray(source)) {
+      return;
+    }
     const skipKeys = ['action', 'thought', 'selector', 'url', 'text', 'ms', 'confidence', 'reasoning'];
     for (const key of Object.keys(source)) {
       if (skipKeys.includes(key)) continue;
@@ -210,7 +213,7 @@ export class GeminiService {
       getState,
       executeAction,
       handleFinish,
-      maxSteps = 2,
+      maxAttempts = 2,
       responseFormat = { type: 'json_object' },
       label = 'agent-loop',
     } = options;
@@ -220,8 +223,9 @@ export class GeminiService {
     const clickedSelectors: string[] = [];
     const accumulatedData: any = {};
     const messages: any[] = [];
+    const stateSignatures: string[] = [];
 
-    for (let step = 1; step <= maxSteps; step++) {
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       const state = await getState();
       if (state && typeof state.url === 'string') {
         const currentUrl = state.url.trim();
@@ -230,14 +234,33 @@ export class GeminiService {
         }
       }
 
-      let userContent = '';
-      if (step === 1) {
-        userContent += `[SYSTEM INSTRUCTIONS]:\n${systemPrompt}\n\n`;
+      // Track rolling signature of the state + last feedback
+      const currentSignature = `${state?.url || ''}::${executionFeedback || ''}`;
+      let repeatCount = 0;
+      for (let i = stateSignatures.length - 1; i >= 0; i--) {
+        if (stateSignatures[i] === currentSignature) {
+          repeatCount++;
+        } else {
+          break;
+        }
       }
-      userContent += buildUserPrompt(step, maxSteps, state, executionFeedback);
-      executionFeedback = null;
+      stateSignatures.push(currentSignature);
+      if (stateSignatures.length > 5) {
+        stateSignatures.shift();
+      }
 
-      // Extract post IDs and determine the active step in the pipeline
+      if (repeatCount >= 3) {
+        this.logger.error(`[${label}] Aborting agent loop early: stuck in loop on state signature: ${currentSignature}`);
+        throw new Error(`Agent loop aborted early: loop detected. Last action feedback: "${executionFeedback}". URL: ${state?.url}`);
+      } else if (repeatCount >= 1) {
+        this.logger.warn(`[${label}] Loop/stuck state detected. Repeat count: ${repeatCount}. Escalating feedback directive.`);
+        const baseFeedback = executionFeedback || 'No feedback';
+        executionFeedback = `STUCK STATE DETECTED! Your last ${repeatCount + 1} attempts made no progress on the same page state (URL and elements did not change, or you received the same feedback). 
+Problem: ${baseFeedback}
+Directive: You must change your approach. If you returned an invalid array, return a single valid action object now. If you clicked something that did not load, try a different selector or action.`;
+      }
+
+      // Extract post IDs and determine the active attempt in the pipeline
       const openedPostIds: string[] = [];
       for (const url of visitedUrls) {
         const match = url.match(/\/p\/([a-zA-Z0-9_-]+)/);
@@ -249,53 +272,117 @@ export class GeminiService {
       const postCount = Array.isArray(accumulatedData.posts) ? accumulatedData.posts.length : 0;
       const hasBio = typeof accumulatedData.bio === 'string' && accumulatedData.bio.trim().length > 0;
 
-      let currentPipelineStep = 'Executing sequential scraping logic...';
-      if (label?.includes('instagram')) {
-        const hasInstagramProfileVisited = visitedUrls.some(u => {
-          const path = u.replace('https://www.instagram.com', '').replace('https://instagram.com', '');
-          return path.length > 1 && !path.startsWith('/p/') && !path.startsWith('/direct/') && !path.startsWith('/reels/') && !path.startsWith('/explore/');
-        });
+      let currentPipelineStep = {
+        stage: 'execute_task',
+        instruction: 'Execute the browser automation task step by step.'
+      };
 
-        if (!hasInstagramProfileVisited) {
-          currentPipelineStep = 'step1_navigate_to_profile()  # Target: Navigate to user profile page';
-        } else if (!hasBio) {
-          currentPipelineStep = 'step2_scrape_bio()           # Target: Extract and save the user bio';
-        } else if (postCount < 5) {
-          currentPipelineStep = `step3_scrape_posts_sequentially()  # Target: Click and scrape Post #${postCount + 1} (already saved ${postCount} posts)`;
-        } else {
-          currentPipelineStep = 'step4_finish()               # Target: Scraped 5 posts successfully, call finish';
+      if (label?.includes('instagram')) {
+        if (label?.includes('scrape-posts')) {
+          const hasInstagramProfileVisited = visitedUrls.some(u => {
+            const path = u.replace('https://www.instagram.com', '').replace('https://instagram.com', '');
+            return path.length > 1 && !path.startsWith('/p/') && !path.startsWith('/direct/') && !path.startsWith('/reels/') && !path.startsWith('/explore/');
+          });
+
+          if (!hasInstagramProfileVisited) {
+            currentPipelineStep = {
+              stage: 'step1_navigate_to_profile',
+              instruction: 'Start from the Instagram home page, locate the link/avatar for the user\'s own profile (usually the "Profile" nav item or the account avatar linking to "/<username>/"), then click or navigate to it.'
+            };
+          } else if (!hasBio) {
+            currentPipelineStep = {
+              stage: 'step2_scrape_bio',
+              instruction: 'Now on the profile page, first extract the user\'s bio text near the top of the profile page. Save this bio in the "bio" field of your action JSON. DO NOT call "finish" yet. Proceed to scrape posts.'
+            };
+          } else if (postCount < 5) {
+            currentPipelineStep = {
+              stage: 'step3_scrape_posts_sequentially',
+              instruction: `Currently saved ${postCount} posts. Target: Click and scrape Post #${postCount + 1}. Remember:
+1. You MUST be on the profile page (URL ends with '/<username>/') to click a post.
+2. Click a post whose ID isn't in ALREADY_OPENED_POST_IDS (e.g. if 'DP_imdqkyCI' is in the list, avoid clicking selectors like 'a[href*="DP_imdqkyCI"]').
+3. Once the post opens, read the caption and save/append it to "posts" array in the action JSON.
+4. You MUST close the post or navigate back to the profile page before attempting to click the next post. Do not click another post from details view.`
+            };
+          } else {
+            currentPipelineStep = {
+              stage: 'step4_finish',
+              instruction: `Scraped ${postCount} posts successfully (at least 5 required). Call the "finish" action with the accumulated "posts" and "bio".`
+            };
+          }
+        } else if (label?.includes('verify-session')) {
+          currentPipelineStep = {
+            stage: 'verify_instagram_session',
+            instruction: 'Analyze the URL and accessibility tree to check if logged in. Look for "Messages" or profile links. If logged out, identify login inputs. Return "finish" with connected: true/false.'
+          };
         }
       } else if (label?.includes('linkedin')) {
-        const isOnLinkedInActivity = visitedUrls.some(u => u.includes('/recent-activity/'));
-        if (!isOnLinkedInActivity) {
-          currentPipelineStep = 'step1_navigate_to_recent_activity()  # Target: Navigate to recent activity page';
-        } else if (postCount < 5) {
-          currentPipelineStep = `step3_extract_posts()  # Target: Scrape Post #${postCount + 1}`;
-        } else {
-          currentPipelineStep = 'step4_finish()        # Target: Scraped all posts, call finish';
+        if (label?.includes('scrape-posts')) {
+          const isOnLinkedInActivity = visitedUrls.some(u => u.includes('/recent-activity/'));
+          if (!isOnLinkedInActivity) {
+            currentPipelineStep = {
+              stage: 'step1_navigate_to_recent_activity',
+              instruction: 'If you are not on the recent activity page, navigate to "https://www.linkedin.com/in/me/recent-activity/all/".'
+            };
+          } else if (postCount < 5) {
+            currentPipelineStep = {
+              stage: 'step3_extract_posts',
+              instruction: `Currently saved ${postCount} posts. Target: Scrape Post #${postCount + 1}. Extract the text content of the user\'s most recent original posts (skip pure reposts/comments) and append to the "posts" array.`
+            };
+          } else {
+            currentPipelineStep = {
+              stage: 'step4_finish',
+              instruction: `Scraped ${postCount} posts successfully. Call the "finish" action with the accumulated "posts" array.`
+            };
+          }
+        } else if (label?.includes('verify-session')) {
+          currentPipelineStep = {
+            stage: 'verify_linkedin_session',
+            instruction: 'Analyze the URL and accessibility tree to check if logged in. Look for nav links ("Home", "My Network") or sign-in buttons. Return "finish" with connected: true/false.'
+          };
+        } else if (label?.includes('post-content')) {
+          currentPipelineStep = {
+            stage: 'post_content_linkedin',
+            instruction: 'Locate the "Start a post" button, open the editor modal, fill the text box with the content to post, click publish, and verify publication. Return "finish" with success: true once complete.'
+          };
         }
       }
 
-      // Inject guidelines about visited URL stack, clicked selectors, and progressive data accumulation
-      userContent += `\n\n# --- SCRAPING CHECKPOINT SYSTEM STATE (Python Variables) ---
-# Current active pipeline step to execute:
->>> ${currentPipelineStep}
+      const customPrefix = buildUserPrompt(attempt, maxAttempts, state, executionFeedback);
+      
+      const feedbackStr = executionFeedback ? `\n\n### LAST ACTION FEEDBACK:\n${executionFeedback}` : '';
+      executionFeedback = null;
 
-# State Variables:
+      let userContent = '';
+      if (attempt === 1) {
+        userContent += `[SYSTEM INSTRUCTIONS]:\n${systemPrompt}\n\n`;
+      }
+
+      userContent += `## CURRENT PIPELINE STAGE
+CURRENT TASK STAGE: ${currentPipelineStep.stage}
+${currentPipelineStep.instruction}
+
+## ATTEMPT INFO
+Attempt: ${attempt} of ${maxAttempts} (Budget/retry counter)
+
+## STATE
+Current Browser URL: ${state.url}
+Page Accessibility Elements (Filtered Tree):
+${typeof state.elements === 'string' ? state.elements : JSON.stringify(state.elements, null, 2)}
+${feedbackStr}
+
+## PROGRESS LOG
 CLICKED_SELECTORS_OR_LINKS = ${JSON.stringify(clickedSelectors)}
 VISITED_URLS = ${JSON.stringify(visitedUrls)}
 ALREADY_OPENED_POST_IDS = ${JSON.stringify(openedPostIds)}
-DATA_SAVED_SO_FAR = ${JSON.stringify(accumulatedData)}
+DATA_SAVED_SO_FAR = ${JSON.stringify(accumulatedData)}`;
 
-# Guidelines:
-# - Compare your current position and targets with ALREADY_OPENED_POST_IDS.
-# - Do NOT click any post selectors or links containing a post ID that is in ALREADY_OPENED_POST_IDS (e.g. if 'DP_imdqkyCI' is in the list, avoid clicking selectors like 'a[href*="DP_imdqkyCI"]').
-# - You must choose a post link representing a DIFFERENT post ID to scrape other posts.
-# - You can save extracted data progressively! Include data fields (e.g., "posts": ["..."], "bio": "...") in ANY action (navigate, click, wait). The system automatically merges them into DATA_SAVED_SO_FAR.`;
+      if (customPrefix && customPrefix.trim().length > 0) {
+        userContent = userContent.replace('## CURRENT PIPELINE STAGE', `## CURRENT PIPELINE STAGE\n${customPrefix.trim()}\n`);
+      }
 
       messages.push({ role: 'user', content: userContent });
 
-      this.logger.log(`[${label}] Step ${step}/${maxSteps}: requesting next action...`);
+      this.logger.log(`[${label}] Attempt ${attempt}/${maxAttempts}: requesting next action...`);
       const responseText = await this.generateCompletion(messages, responseFormat);
       
       let cleanedResponse = responseText.trim();
@@ -304,19 +391,40 @@ DATA_SAVED_SO_FAR = ${JSON.stringify(accumulatedData)}
         cleanedResponse = mdMatch[1].trim();
       }
       
-      const agentAction = JSON.parse(cleanedResponse);
+      let agentAction: any;
+      try {
+        agentAction = JSON.parse(cleanedResponse);
+      } catch (parseErr) {
+        executionFeedback = `Failed to parse response as JSON: ${parseErr.message}. Ensure your output is a valid JSON object matching the requested schema.`;
+        messages.push({ role: 'assistant', content: responseText });
+        continue;
+      }
 
-      // Save the LLM's response as system role as requested
-      messages.push({ role: 'system', content: responseText });
+      if (Array.isArray(agentAction)) {
+        executionFeedback = "You returned an array of multiple actions. You must respond with exactly ONE JSON action object per turn — choose only the single next action to perform now.";
+        messages.push({ role: 'assistant', content: responseText });
+        continue;
+      }
+
+      const recognizedActions = ['navigate', 'click', 'wait', 'finish', 'fill'];
+      if (!agentAction || typeof agentAction !== 'object' || !agentAction.action || typeof agentAction.action !== 'string' || !recognizedActions.includes(agentAction.action.trim())) {
+        executionFeedback = `Your response is missing a valid "action" key or the action is not recognized. Recognized actions are: ${recognizedActions.join(', ')}. Please return exactly ONE JSON action object per turn.`;
+        messages.push({ role: 'assistant', content: responseText });
+        continue;
+      }
+
+      // Save the LLM's response as assistant role
+      messages.push({ role: 'assistant', content: responseText });
 
       // Accumulate any data returned in this step
       this.accumulateActionData(accumulatedData, agentAction);
+      this.logger.log(`[${label}] Accumulated data so far: ${JSON.stringify(accumulatedData)}`);
 
-      this.logger.log(`[${label}] Step ${step}: thought=${agentAction.thought || 'None'} action=${agentAction.action}`);
+      this.logger.log(`[${label}] Attempt ${attempt}: thought=${agentAction.thought || 'None'} action=${agentAction.action}`);
 
       if (agentAction.action === 'finish') {
         if (handleFinish) {
-          const verdict = await handleFinish(agentAction, step, maxSteps);
+          const verdict = await handleFinish(agentAction, attempt, maxAttempts);
           if (!verdict.accept) {
             executionFeedback = verdict.feedback || "Action outputted 'finish' but was not accepted. Retrying...";
             continue;
@@ -345,6 +453,6 @@ DATA_SAVED_SO_FAR = ${JSON.stringify(accumulatedData)}
       return { action: 'finish', ...accumulatedData };
     }
 
-    throw new Error(`Agent loop [${label}] exceeded max steps (${maxSteps}) without a finish action and no accumulated data.`);
+    throw new Error(`Agent loop [${label}] exceeded max steps (${maxAttempts}) without a finish action and no accumulated data.`);
   }
 }

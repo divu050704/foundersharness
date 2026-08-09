@@ -69,85 +69,7 @@ export class SocialMediaService {
     return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
-  /**
- * Removes noise from the raw accessibility snapshot and caps unbounded growth
- * (e.g. infinite-scroll feeds appending more articles every step) so token
- * usage stays flat across steps instead of compounding.
- */
-  private pruneAccessibilityTree(raw: string, opts: { maxArticles?: number; maxUrlLen?: number; maxChars?: number } = {}): string {
-    const { maxArticles = 6, maxUrlLen = 120, maxChars = 12000 } = opts;
-
-    const getIndent = (line: string) => {
-      const m = line.match(/^(\s*)/);
-      return m ? m[1].length : 0;
-    };
-
-    // 1. Drop noisy blocks entirely: language combobox, footer contentinfo.
-    const dropPatterns = [/combobox\s+"Switch Display Language"/, /^-\s*contentinfo:/];
-    const lines = raw.split('\n');
-    const kept: string[] = [];
-    let skipIndent: number | null = null;
-
-    for (const line of lines) {
-      const indent = getIndent(line);
-      if (skipIndent !== null) {
-        if (line.trim() === '' || indent > skipIndent) continue;
-        skipIndent = null;
-      }
-      if (dropPatterns.some((p) => p.test(line))) {
-        skipIndent = indent;
-        continue;
-      }
-      kept.push(line);
-    }
-    let pruned = kept.join('\n');
-
-    // 2. Truncate individual mega-URLs (ad tracking links etc.) — keep them
-    // identifiable but not token-expensive.
-    pruned = pruned.replace(/(\/url:\s*)(\S{OVERLONG})/g, ''); // placeholder removed below
-    pruned = pruned.replace(/(\/url:\s*)(\S+)/g, (_m, prefix, url) =>
-      url.length > maxUrlLen ? `${prefix}${url.slice(0, maxUrlLen)}...[truncated]` : `${prefix}${url}`,
-    );
-
-    // 3. Cap the number of "- article:" blocks so an infinite-scroll feed
-    // doesn't grow the tree every step — keep only the first N.
-    const articleLines = pruned.split('\n');
-    let articleCount = 0;
-    const capped: string[] = [];
-    let dropArticle = false;
-    let articleIndent: number | null = null;
-
-    for (const line of articleLines) {
-      const indent = getIndent(line);
-      const isArticleStart = /^\s*-\s*article:/.test(line);
-
-      if (dropArticle) {
-        if (indent > (articleIndent ?? 0)) continue;
-        dropArticle = false;
-        articleIndent = null;
-      }
-
-      if (isArticleStart) {
-        articleCount++;
-        if (articleCount > maxArticles) {
-          dropArticle = true;
-          articleIndent = indent;
-          continue;
-        }
-      }
-      capped.push(line);
-    }
-    pruned = capped.join('\n');
-
-    // 4. Hard safety cap regardless of the above.
-    if (pruned.length > maxChars) {
-      pruned = pruned.slice(0, maxChars) + `\n...[truncated, ${pruned.length - maxChars} more chars dropped]`;
-    }
-
-    return pruned;
-  }
-
-  /**
+    /**
    * Extracts a structured, noise-filtered representation of the page's accessibility
    * elements. This is the platform-agnostic "state" every agent loop reasons over.
    */
@@ -159,8 +81,6 @@ export class SocialMediaService {
       });
 
       const rawElements = await this.deviceHookService.sendCommand('content');
-      const elements = this.pruneAccessibilityTree(String(rawElements ?? ''));
-      console.log(rawElements)
       return { url: url || '', elements: rawElements };
     } catch (err) {
       this.logger.error('Failed to get browser state:', err.message);
@@ -171,20 +91,12 @@ export class SocialMediaService {
   /** Shared user-prompt builder for the browser-state-driven agent loops. */
   private buildBrowserUserPrompt(
     prefix: string,
-    step: number,
-    maxSteps: number,
+    attempt: number,
+    maxAttempts: number,
     state: { url: string; elements: string },
     feedback: string | null,
   ): string {
-    let prompt = `${prefix}Step ${step}/${maxSteps}:
-Current Browser URL: ${state.url}
-Page Accessibility Elements (Filtered Tree):
-${JSON.stringify(state.elements, null, 2)}`;
-
-    if (feedback) {
-      prompt += `\n\n[System Feedback from previous step]:\n${feedback}`;
-    }
-    return prompt;
+    return prefix || '';
   }
 
   /** Shared navigate/click/wait executor used by the browser-driving agent loops. */
@@ -253,12 +165,12 @@ ${JSON.stringify(state.elements, null, 2)}`;
       const result = await this.geminiService.runAgentLoop({
         label: `verify-session:${platform}`,
         systemPrompt: agent.systemPrompt,
-        maxSteps: 3,
+        maxAttempts: 3,
         getState: () => this.getBrowserState(),
-        buildUserPrompt: (step, maxSteps, state, feedback) =>
-          this.buildBrowserUserPrompt(`${agent.generatePrompt({ platform, platformHint })}\n      `, step, maxSteps, state, feedback),
-        handleFinish: async (action, step, maxSteps) => {
-          if (action.confidence === 'low' && step < maxSteps) {
+        buildUserPrompt: (attempt, maxAttempts, state, feedback) =>
+          this.buildBrowserUserPrompt(`${agent.generatePrompt({ platform, platformHint })}\n      `, attempt, maxAttempts, state, feedback),
+        handleFinish: async (action, attempt, maxAttempts) => {
+          if (action.confidence === 'low' && attempt < maxAttempts) {
             this.logger.warn(`Agent returned 'low' confidence status: ${action.reasoning || 'Wait requested'}. Waiting 3s to retry...`);
             await this.sleep(3000);
             return { accept: false, feedback: "Action outputted 'finish' with low confidence. Retrying verification check..." };
@@ -329,10 +241,10 @@ Rules:
       const result = await this.geminiService.runAgentLoop({
         label: `post-content:${platform}`,
         systemPrompt,
-        maxSteps: 3,
+        maxAttempts: 3,
         getState: () => this.getBrowserState(),
-        buildUserPrompt: (step, maxSteps, state, feedback) =>
-          this.buildBrowserUserPrompt('', step, maxSteps, state, feedback),
+        buildUserPrompt: (attempt, maxAttempts, state, feedback) =>
+          this.buildBrowserUserPrompt('', attempt, maxAttempts, state, feedback),
         executeAction: (action) => this.executeBrowserAction(action, { navigateTimeoutMs: 15000, clickTimeoutMs: 35000 }),
       });
 
@@ -370,31 +282,30 @@ Rules:
 
       const hint = SCRAPE_PLATFORM_HINTS[platform];
       const systemPrompt = `You are a browser automation agent whose job is to scrape past ${platform} content (5 to 7 posts) for the current logged-in user.
-${hint}
+        ${hint}
 
-You can execute the following JSON actions:
-1. Navigate: {"action": "navigate", "url": "..."}
-2. Click: {"action": "click", "selector": "..."}
-3. Wait: {"action": "wait", "ms": 2000}
-4. Finish: {"action": "finish", "posts": ["post text 1", "post text 2", ...], "bio": "optional bio text"}
+        You can execute the following JSON actions:
+        1. Navigate: {"action": "navigate", "url": "...", "step": "current step in the instruction or the next step if current completed as step_<number>"}
+        2. Click: {"action": "click", "selector": "...", "step": "current step in the instruction or the next step if current completed as step_<number>"}
+        3. Wait: {"action": "wait", "ms": 2000, "step": "current step in the instruction or the next step if current completed as step_<number>"}
+        4. Finish: {"action": "finish", "posts": ["post text 1", "post text 2", ...], "bio": "optional bio text", "step": "current step in the instruction or the next step if current completed as step_<number>"}
 
-Rules:
-- Respond ONLY with a valid JSON object matching one of the actions above.
-- Avoid Repeated Clicks: Inspect the CLICKED_SELECTORS_OR_LINKS array variable provided in your prompt checkpoint state. DO NOT click the exact same selector/element again. Choose a different selector/element for subsequent posts.
-- Prefer reading text directly from the accessibility elements tree over clicking whenever possible.
-- DO NOT call "finish" early. You must scrape at least 5 posts (up to 7 posts) before calling "finish". You are only allowed to finish with 0 posts if there are absolutely no post links present on the profile page after navigating.
-- Only call "finish" once you have completed the sequential post scraping pipeline. Never call "finish" immediately after step2_scrape_bio().`;
+        Rules:
+        - Respond ONLY with a valid JSON object matching one of the actions above.
+        - Avoid Repeated Clicks: Inspect the CLICKED_SELECTORS_OR_LINKS array variable provided in your prompt checkpoint state. DO NOT click the exact same selector/element again. Choose a different selector/element for subsequent posts.
+        - Prefer reading text directly from the accessibility elements tree over clicking whenever possible.
+        - DO NOT call "finish" early. You must scrape at least 5 posts (up to 7 posts) before calling "finish". You are only allowed to finish with 0 posts if there are absolutely no post links present on the profile page after navigating.
+        - Only call "finish" once you have completed the sequential post scraping pipeline. Never call "finish" immediately after step2_scrape_bio().`;
 
       const result = await this.geminiService.runAgentLoop({
         label: `scrape-posts:${platform}`,
         systemPrompt,
-        maxSteps: 20,
+        maxAttempts: 20,
         getState: () => this.getBrowserState(),
-        buildUserPrompt: (step, maxSteps, state, feedback) =>
-          this.buildBrowserUserPrompt('', step, maxSteps, state, feedback),
+        buildUserPrompt: (attempt, maxAttempts, state, feedback) =>
+          this.buildBrowserUserPrompt('', attempt, maxAttempts, state, feedback),
         executeAction: (action) => this.executeBrowserAction(action, { navigateTimeoutMs: 15000, clickTimeoutMs: 35000 }),
       });
-      console.log(result)
       const posts = Array.isArray(result.posts)
         ? result.posts.filter((p: any) => typeof p === 'string' && p.trim().length > 0)
         : [];
@@ -411,21 +322,6 @@ Rules:
     return { posts: [] };
   }
 
-  // private getSimulatedPastPosts(platform: 'linkedin' | 'instagram'): string[] {
-  //   if (platform === 'linkedin') {
-  //     return [
-  //       "Excited to share that we are building the future of startup tooling. Automating founder workflows to save 10+ hours a week. What is your biggest operational bottleneck?",
-  //       "Why standard RAG fails for company memory: vectors alone cannot model business relationships or temporal timelines. You need multiple memory subsystems. Thread below 👇",
-  //       "Building in public is hard but rewarding. Our pre-seed commitments just hit a new milestone. Huge thanks to our early alpha users for the feedback!",
-  //     ];
-  //   } else {
-  //     return [
-  //       "Behind the scenes of our new startup dashboard launch! 🚀 #startup #founderlife #buildinpublic",
-  //       "How it started vs How it's going: from a messy spreadsheet to clean automated routines. Link in bio! 💻✨",
-  //       "Designing the ultimate long-term AI memory engine. Which stack would you choose?",
-  //     ];
-  //   }
-  // }
 
   private cleanAndParseJson(raw: string): any {
     let clean = raw.trim();
