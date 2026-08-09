@@ -37,14 +37,15 @@ export class ContextBuilder {
         queryLower.includes(ent.type.toLowerCase()) ||
         (ent.data &&
           Object.values(ent.data).some(
-            (val) => typeof val === 'string' && queryLower.includes(val.toLowerCase()),
+            (val) =>
+              typeof val === 'string' && queryLower.includes(val.toLowerCase()),
           )),
     );
 
     // 4. Retrieve Graph relations from Neo4j for matched entities
     const graphRelationships: any[] = [];
     const entityNames = new Set<string>();
-    
+
     // Extract potential node matches directly from query
     allEntities.forEach((ent) => {
       if (queryLower.includes(ent.name.toLowerCase())) {

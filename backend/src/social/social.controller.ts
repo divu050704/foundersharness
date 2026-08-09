@@ -1,4 +1,11 @@
-import { Controller, Get, Post, Body, Query, BadRequestException } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Query,
+  BadRequestException,
+} from '@nestjs/common';
 import { SocialMediaService } from './social.service';
 import { DeviceHookService } from './device-hook.service';
 
@@ -26,12 +33,18 @@ export class SocialMediaController {
    * Endpoint to check session status for LinkedIn and Instagram
    */
   @Get('session-status')
-  async getSessionStatus(@Query('platform') platform: 'linkedin' | 'instagram'): Promise<any> {
+  async getSessionStatus(
+    @Query('platform') platform: 'linkedin' | 'instagram',
+  ): Promise<any> {
     if (!platform) {
-      throw new BadRequestException('Platform parameter is required (linkedin or instagram).');
+      throw new BadRequestException(
+        'Platform parameter is required (linkedin or instagram).',
+      );
     }
     if (platform !== 'linkedin' && platform !== 'instagram') {
-      throw new BadRequestException('Invalid platform. Supported platforms: linkedin, instagram.');
+      throw new BadRequestException(
+        'Invalid platform. Supported platforms: linkedin, instagram.',
+      );
     }
 
     try {
@@ -57,11 +70,16 @@ export class SocialMediaController {
       throw new BadRequestException('Both platform and content are required.');
     }
     if (platform !== 'linkedin' && platform !== 'instagram') {
-      throw new BadRequestException('Invalid platform. Supported platforms: linkedin, instagram.');
+      throw new BadRequestException(
+        'Invalid platform. Supported platforms: linkedin, instagram.',
+      );
     }
 
     try {
-      const result = await this.socialMediaService.postContent(platform, content);
+      const result = await this.socialMediaService.postContent(
+        platform,
+        content,
+      );
       return result;
     } catch (err) {
       return {
@@ -83,11 +101,15 @@ export class SocialMediaController {
    * Endpoint to trigger generation of 7-day calendar
    */
   @Post('generate-calendar')
-  async generateCalendar(@Body('platform') platform: 'linkedin' | 'instagram'): Promise<any> {
+  async generateCalendar(
+    @Body('platform') platform: 'linkedin' | 'instagram',
+  ): Promise<any> {
     if (!platform || (platform !== 'linkedin' && platform !== 'instagram')) {
-      throw new BadRequestException('Valid platform (linkedin or instagram) is required.');
+      throw new BadRequestException(
+        'Valid platform (linkedin or instagram) is required.',
+      );
     }
-    
+
     try {
       const calendar = await this.socialMediaService.generateCalendar(platform);
       return {

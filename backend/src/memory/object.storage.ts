@@ -17,7 +17,10 @@ export class ObjectStorage {
     }
   }
 
-  async storeFile(fileName: string, content: Buffer | string): Promise<{ fileId: string; filePath: string }> {
+  async storeFile(
+    fileName: string,
+    content: Buffer | string,
+  ): Promise<{ fileId: string; filePath: string }> {
     this.ensureStorageDirExists();
     const sanitizedName = fileName.replace(/[^a-zA-Z0-9.-]/g, '_');
     const uniqueName = `${Date.now()}_${sanitizedName}`;
@@ -36,7 +39,9 @@ export class ObjectStorage {
     };
   }
 
-  async getFile(fileId: string): Promise<{ content: string | Buffer; fileName: string } | null> {
+  async getFile(
+    fileId: string,
+  ): Promise<{ content: string | Buffer; fileName: string } | null> {
     const filePath = path.join(this.storageDir, fileId);
     if (!fs.existsSync(filePath)) {
       return null;

@@ -10,8 +10,8 @@ export interface PipelineContext {
 }
 
 export interface PipelineStage {
-  stage: string;                    // e.g. "step2_scrape_bio"
-  isActive: (ctx: PipelineContext) => boolean;  // is this the current stage?
+  stage: string; // e.g. "step2_scrape_bio"
+  isActive: (ctx: PipelineContext) => boolean; // is this the current stage?
   instruction: (ctx: PipelineContext) => string; // what to tell the model
 }
 
@@ -24,11 +24,29 @@ export interface AgentFinishVerdict {
   feedback?: string;
 }
 
+export interface FieldRequirement {
+  /** The field name in the accumulated finish data, e.g. "posts" or "bio". */
+  field: string;
+  /** For array fields: minimum number of VALID entries required before finish is accepted. */
+  minValidCount?: number;
+  /** For scalar fields: must be a non-empty value. */
+  required?: boolean;
+  /** Optional per-item validity check for array fields (e.g. reject URL-shaped strings). Defaults to "truthy + not empty string". */
+  itemValidator?: (item: any) => boolean;
+  /** Human-readable description used in the auto-generated rejection feedback. */
+  description?: string;
+}
+
 export interface AgentLoopOptions {
   /** System prompt sent to the model for every step of this loop. */
   systemPrompt: string;
   /** Builds the user-turn prompt for a given step from the latest state + feedback. */
-  buildUserPrompt: (attempt: number, maxAttempts: number, state: any, feedback: string | null) => string;
+  buildUserPrompt: (
+    attempt: number,
+    maxAttempts: number,
+    state: any,
+    feedback: string | null,
+  ) => string;
   /** Fetches whatever "world state" (e.g. browser state) should be shown to the model each step. */
   getState: () => Promise<any>;
   /** Executes a non-"finish" action returned by the model. Throw to signal failure (fed back as feedback). */
@@ -37,20 +55,27 @@ export interface AgentLoopOptions {
    * Optional gate on "finish" actions - e.g. to reject low-confidence finishes and retry.
    * If omitted, any "finish" action is accepted immediately.
    */
-  handleFinish?: (action: any, attempt: number, maxAttempts: number) => Promise<AgentFinishVerdict>;
+  handleFinish?: (
+    action: any,
+    attempt: number,
+    maxAttempts: number,
+  ) => Promise<AgentFinishVerdict>;
   maxAttempts?: number;
   responseFormat?: { type: 'json_object' };
   /** Optional label used in log lines to distinguish concurrent/different agent loops. */
   label?: string;
   /** Ordered list of pipeline stages to evaluate sequentially. */
   pipelineStages?: PipelineStage[];
+  /** Declarative requirements checked automatically before a "finish" action is accepted. */
+  finishRequirements?: FieldRequirement[];
 }
 
 @Injectable()
 export class GeminiService {
   private readonly logger = new Logger(GeminiService.name);
   private apiKey: string | null = null;
-  private readonly apiUrl = 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions';
+  private readonly apiUrl =
+    'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions';
   private readonly modelName = 'gemini-3.1-flash-lite';
 
   constructor() {
@@ -110,7 +135,9 @@ export class GeminiService {
 
     if (!this.apiKey) {
       this.logger.error('GEMINI_API_KEY is not configured.');
-      throw new Error('GEMINI_API_KEY is missing. Please add it to your backend .env file.');
+      throw new Error(
+        'GEMINI_API_KEY is missing. Please add it to your backend .env file.',
+      );
     }
 
     const models = [
@@ -136,7 +163,7 @@ export class GeminiService {
           temperature: 0.2,
           max_tokens: 8192,
         };
-        console.log(payload)
+        console.log(payload);
 
         const actualFormat = Array.isArray(systemPromptOrMessages)
           ? (userPrompt as { type: 'json_object' })
@@ -149,7 +176,7 @@ export class GeminiService {
         const response = await fetch(this.apiUrl, {
           method: 'POST',
           headers: {
-            'Authorization': `Bearer ${this.apiKey}`,
+            Authorization: `Bearer ${this.apiKey}`,
             'Content-Type': 'application/json',
           },
           body: JSON.stringify(payload),
@@ -157,31 +184,61 @@ export class GeminiService {
 
         if (!response.ok) {
           const errText = await response.text();
-          throw new Error(`API request failed: Status ${response.status} - ${errText}`);
+          throw new Error(
+            `API request failed: Status ${response.status} - ${errText}`,
+          );
         }
 
-        const data = (await response.json()) as any;
-        if (data && data.choices && data.choices[0] && data.choices[0].message) {
-          this.logger.log(`Successfully generated completion using model: ${model}`);
+        const data = await response.json();
+        if (
+          data &&
+          data.choices &&
+          data.choices[0] &&
+          data.choices[0].message
+        ) {
+          this.logger.log(
+            `Successfully generated completion using model: ${model}`,
+          );
           return data.choices[0].message.content || '';
         }
 
         throw new Error('Malformed completion response structure.');
       } catch (error) {
-        this.logger.warn(`Error generating completion with model ${model}: ${error.message}`);
+        this.logger.warn(
+          `Error generating completion with model ${model}: ${error.message}`,
+        );
         lastError = error;
       }
     }
 
-    this.logger.error('All Gemini and fallback models failed to generate completion.');
+    this.logger.error(
+      'All Gemini and fallback models failed to generate completion.',
+    );
     throw lastError || new Error('All models failed.');
+  }
+
+  private defaultItemValidator(item: any): boolean {
+    if (typeof item !== 'string') return item !== undefined && item !== null;
+    const trimmed = item.trim();
+    if (trimmed.length === 0) return false;
+    if (trimmed.startsWith('/') || trimmed.startsWith('http')) return false; // reject URL/path-shaped strings by default
+    return true;
   }
 
   private accumulateActionData(target: any, source: any) {
     if (!source || typeof source !== 'object' || Array.isArray(source)) {
       return;
     }
-    const skipKeys = ['action', 'thought', 'selector', 'url', 'text', 'ms', 'confidence', 'reasoning'];
+    const skipKeys = [
+      'action',
+      'thought',
+      'selector',
+      'url',
+      'text',
+      'ms',
+      'confidence',
+      'reasoning',
+    ];
     for (const key of Object.keys(source)) {
       if (skipKeys.includes(key)) continue;
       const value = source[key];
@@ -192,9 +249,12 @@ export class GeminiService {
           target[key] = [];
         }
         for (const item of value) {
-          const strItem = typeof item === 'object' ? JSON.stringify(item) : String(item);
-          const exists = target[key].some((el: any) => 
-            (typeof el === 'object' ? JSON.stringify(el) : String(el)) === strItem
+          const strItem =
+            typeof item === 'object' ? JSON.stringify(item) : String(item);
+          const exists = target[key].some(
+            (el: any) =>
+              (typeof el === 'object' ? JSON.stringify(el) : String(el)) ===
+              strItem,
           );
           if (!exists) {
             target[key].push(item);
@@ -206,7 +266,11 @@ export class GeminiService {
         }
         this.accumulateActionData(target[key], value);
       } else {
-        if (target[key] === undefined || target[key] === null || String(value).trim().length > 0) {
+        if (
+          target[key] === undefined ||
+          target[key] === null ||
+          String(value).trim().length > 0
+        ) {
           target[key] = value;
         }
       }
@@ -236,6 +300,7 @@ export class GeminiService {
     let executionFeedback: string | null = null;
     const visitedUrls: string[] = [];
     const clickedSelectors: string[] = [];
+    const clickedHrefs: string[] = [];
     const accumulatedData: any = {};
     const messages: any[] = [];
     const stateSignatures: string[] = [];
@@ -265,10 +330,16 @@ export class GeminiService {
       }
 
       if (repeatCount >= 3) {
-        this.logger.error(`[${label}] Aborting agent loop early: stuck in loop on state signature: ${currentSignature}`);
-        throw new Error(`Agent loop aborted early: loop detected. Last action feedback: "${executionFeedback}". URL: ${state?.url}`);
+        this.logger.error(
+          `[${label}] Aborting agent loop early: stuck in loop on state signature: ${currentSignature}`,
+        );
+        throw new Error(
+          `Agent loop aborted early: loop detected. Last action feedback: "${executionFeedback}". URL: ${state?.url}`,
+        );
       } else if (repeatCount >= 1) {
-        this.logger.warn(`[${label}] Loop/stuck state detected. Repeat count: ${repeatCount}. Escalating feedback directive.`);
+        this.logger.warn(
+          `[${label}] Loop/stuck state detected. Repeat count: ${repeatCount}. Escalating feedback directive.`,
+        );
         const baseFeedback = executionFeedback || 'No feedback';
         executionFeedback = `STUCK STATE DETECTED! Your last ${repeatCount + 1} attempts made no progress on the same page state (URL and elements did not change, or you received the same feedback). 
 Problem: ${baseFeedback}
@@ -284,37 +355,59 @@ Directive: You must change your approach. If you returned an invalid array, retu
         }
       }
 
-      const postCount = Array.isArray(accumulatedData.posts) ? accumulatedData.posts.length : 0;
-      const hasBio = typeof accumulatedData.bio === 'string' && accumulatedData.bio.trim().length > 0;
+      const postCount = Array.isArray(accumulatedData.posts)
+        ? accumulatedData.posts.length
+        : 0;
+      const hasBio =
+        typeof accumulatedData.bio === 'string' &&
+        accumulatedData.bio.trim().length > 0;
 
       let currentPipelineStep = {
         stage: 'execute_task',
-        instruction: 'Execute the browser automation task step by step.'
+        instruction: 'Execute the browser automation task step by step.',
       };
 
       if (options.pipelineStages && options.pipelineStages.length > 0) {
-        const ctx: PipelineContext = { visitedUrls, clickedSelectors, accumulatedData, state };
-        const active = options.pipelineStages.find(s => s.isActive(ctx));
+        const ctx: PipelineContext = {
+          visitedUrls,
+          clickedSelectors,
+          accumulatedData,
+          state,
+        };
+        const active = options.pipelineStages.find((s) => s.isActive(ctx));
         if (active) {
-          currentPipelineStep = { stage: active.stage, instruction: active.instruction(ctx) };
+          currentPipelineStep = {
+            stage: active.stage,
+            instruction: active.instruction(ctx),
+          };
         }
       } else {
         if (label?.includes('instagram')) {
           if (label?.includes('scrape-posts')) {
-            const hasInstagramProfileVisited = visitedUrls.some(u => {
-              const path = u.replace('https://www.instagram.com', '').replace('https://instagram.com', '');
-              return path.length > 1 && !path.startsWith('/p/') && !path.startsWith('/direct/') && !path.startsWith('/reels/') && !path.startsWith('/explore/');
+            const hasInstagramProfileVisited = visitedUrls.some((u) => {
+              const path = u
+                .replace('https://www.instagram.com', '')
+                .replace('https://instagram.com', '');
+              return (
+                path.length > 1 &&
+                !path.startsWith('/p/') &&
+                !path.startsWith('/direct/') &&
+                !path.startsWith('/reels/') &&
+                !path.startsWith('/explore/')
+              );
             });
 
             if (!hasInstagramProfileVisited) {
               currentPipelineStep = {
                 stage: 'step1_navigate_to_profile',
-                instruction: 'Start from the Instagram home page, locate the link/avatar for the user\'s own profile (usually the "Profile" nav item or the account avatar linking to "/<username>/"), then click or navigate to it.'
+                instruction:
+                  'Start from the Instagram home page, locate the link/avatar for the user\'s own profile (usually the "Profile" nav item or the account avatar linking to "/<username>/"), then click or navigate to it.',
               };
             } else if (!hasBio) {
               currentPipelineStep = {
                 stage: 'step2_scrape_bio',
-                instruction: 'Now on the profile page, first extract the user\'s bio text near the top of the profile page. Save this bio in the "bio" field of your action JSON. DO NOT call "finish" yet. Proceed to scrape posts.'
+                instruction:
+                  'Now on the profile page, first extract the user\'s bio text near the top of the profile page. Save this bio in the "bio" field of your action JSON. DO NOT call "finish" yet. Proceed to scrape posts.',
               };
             } else if (postCount < 5) {
               currentPipelineStep = {
@@ -323,56 +416,69 @@ Directive: You must change your approach. If you returned an invalid array, retu
 1. You MUST be on the profile page (URL ends with '/<username>/') to click a post.
 2. Click a post whose ID isn't in ALREADY_OPENED_POST_IDS (e.g. if 'DP_imdqkyCI' is in the list, avoid clicking selectors like 'a[href*="DP_imdqkyCI"]').
 3. Once the post opens, read the caption and save/append it to "posts" array in the action JSON.
-4. You MUST close the post or navigate back to the profile page before attempting to click the next post. Do not click another post from details view.`
+4. You MUST close the post or navigate back to the profile page before attempting to click the next post. Do not click another post from details view.`,
               };
             } else {
               currentPipelineStep = {
                 stage: 'step4_finish',
-                instruction: `Scraped ${postCount} posts successfully (at least 5 required). Call the "finish" action with the accumulated "posts" and "bio".`
+                instruction: `Scraped ${postCount} posts successfully (at least 5 required). Call the "finish" action with the accumulated "posts" and "bio".`,
               };
             }
           } else if (label?.includes('verify-session')) {
             currentPipelineStep = {
               stage: 'verify_instagram_session',
-              instruction: 'Analyze the URL and accessibility tree to check if logged in. Look for "Messages" or profile links. If logged out, identify login inputs. Return "finish" with connected: true/false.'
+              instruction:
+                'Analyze the URL and accessibility tree to check if logged in. Look for "Messages" or profile links. If logged out, identify login inputs. Return "finish" with connected: true/false.',
             };
           }
         } else if (label?.includes('linkedin')) {
           if (label?.includes('scrape-posts')) {
-            const isOnLinkedInActivity = visitedUrls.some(u => u.includes('/recent-activity/'));
+            const isOnLinkedInActivity = visitedUrls.some((u) =>
+              u.includes('/recent-activity/'),
+            );
             if (!isOnLinkedInActivity) {
               currentPipelineStep = {
                 stage: 'step1_navigate_to_recent_activity',
-                instruction: 'If you are not on the recent activity page, navigate to "https://www.linkedin.com/in/me/recent-activity/all/".'
+                instruction:
+                  'If you are not on the recent activity page, navigate to "https://www.linkedin.com/in/me/recent-activity/all/".',
               };
             } else if (postCount < 5) {
               currentPipelineStep = {
                 stage: 'step3_extract_posts',
-                instruction: `Currently saved ${postCount} posts. Target: Scrape Post #${postCount + 1}. Extract the text content of the user\'s most recent original posts (skip pure reposts/comments) and append to the "posts" array.`
+                instruction: `Currently saved ${postCount} posts. Target: Scrape Post #${postCount + 1}. Extract the text content of the user\'s most recent original posts (skip pure reposts/comments) and append to the "posts" array.`,
               };
             } else {
               currentPipelineStep = {
                 stage: 'step4_finish',
-                instruction: `Scraped ${postCount} posts successfully. Call the "finish" action with the accumulated "posts" array.`
+                instruction: `Scraped ${postCount} posts successfully. Call the "finish" action with the accumulated "posts" array.`,
               };
             }
           } else if (label?.includes('verify-session')) {
             currentPipelineStep = {
               stage: 'verify_linkedin_session',
-              instruction: 'Analyze the URL and accessibility tree to check if logged in. Look for nav links ("Home", "My Network") or sign-in buttons. Return "finish" with connected: true/false.'
+              instruction:
+                'Analyze the URL and accessibility tree to check if logged in. Look for nav links ("Home", "My Network") or sign-in buttons. Return "finish" with connected: true/false.',
             };
           } else if (label?.includes('post-content')) {
             currentPipelineStep = {
               stage: 'post_content_linkedin',
-              instruction: 'Locate the "Start a post" button, open the editor modal, fill the text box with the content to post, click publish, and verify publication. Return "finish" with success: true once complete.'
+              instruction:
+                'Locate the "Start a post" button, open the editor modal, fill the text box with the content to post, click publish, and verify publication. Return "finish" with success: true once complete.',
             };
           }
         }
       }
 
-      const customPrefix = buildUserPrompt(attempt, maxAttempts, state, executionFeedback);
-      
-      const feedbackStr = executionFeedback ? `\n\n### LAST ACTION FEEDBACK:\n${executionFeedback}` : '';
+      const customPrefix = buildUserPrompt(
+        attempt,
+        maxAttempts,
+        state,
+        executionFeedback,
+      );
+
+      const feedbackStr = executionFeedback
+        ? `\n\n### LAST ACTION FEEDBACK:\n${executionFeedback}`
+        : '';
       executionFeedback = null;
 
       let userContent = '';
@@ -400,20 +506,28 @@ ALREADY_OPENED_POST_IDS = ${JSON.stringify(openedPostIds)}
 DATA_SAVED_SO_FAR = ${JSON.stringify(accumulatedData)}`;
 
       if (customPrefix && customPrefix.trim().length > 0) {
-        userContent = userContent.replace('## CURRENT PIPELINE STAGE', `## CURRENT PIPELINE STAGE\n${customPrefix.trim()}\n`);
+        userContent = userContent.replace(
+          '## CURRENT PIPELINE STAGE',
+          `## CURRENT PIPELINE STAGE\n${customPrefix.trim()}\n`,
+        );
       }
 
       messages.push({ role: 'user', content: userContent });
 
-      this.logger.log(`[${label}] Attempt ${attempt}/${maxAttempts}: requesting next action...`);
-      const responseText = await this.generateCompletion(messages, responseFormat);
-      
+      this.logger.log(
+        `[${label}] Attempt ${attempt}/${maxAttempts}: requesting next action...`,
+      );
+      const responseText = await this.generateCompletion(
+        messages,
+        responseFormat,
+      );
+
       let cleanedResponse = responseText.trim();
       const mdMatch = cleanedResponse.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
       if (mdMatch) {
         cleanedResponse = mdMatch[1].trim();
       }
-      
+
       let agentAction: any;
       try {
         agentAction = JSON.parse(cleanedResponse);
@@ -424,32 +538,87 @@ DATA_SAVED_SO_FAR = ${JSON.stringify(accumulatedData)}`;
       }
 
       if (Array.isArray(agentAction)) {
-        executionFeedback = "You returned an array of multiple actions. You must respond with exactly ONE JSON action object per turn — choose only the single next action to perform now.";
+        executionFeedback =
+          'You returned an array of multiple actions. You must respond with exactly ONE JSON action object per turn — choose only the single next action to perform now.';
         messages.push({ role: 'assistant', content: responseText });
         continue;
       }
 
       const recognizedActions = ['navigate', 'click', 'wait', 'finish', 'fill'];
-      if (!agentAction || typeof agentAction !== 'object' || !agentAction.action || typeof agentAction.action !== 'string' || !recognizedActions.includes(agentAction.action.trim())) {
+      if (
+        !agentAction ||
+        typeof agentAction !== 'object' ||
+        !agentAction.action ||
+        typeof agentAction.action !== 'string' ||
+        !recognizedActions.includes(agentAction.action.trim())
+      ) {
         executionFeedback = `Your response is missing a valid "action" key or the action is not recognized. Recognized actions are: ${recognizedActions.join(', ')}. Please return exactly ONE JSON action object per turn.`;
         messages.push({ role: 'assistant', content: responseText });
         continue;
       }
 
       // Save the LLM's response as assistant role
+      if (agentAction.action === 'click' && typeof agentAction.selector === 'string') {
+        const hrefMatch = agentAction.selector.match(/href=['"]([^'"]+)['"]/);
+        if (hrefMatch) {
+          const href = hrefMatch[1];
+          if (clickedHrefs.includes(href)) {
+            executionFeedback = `REJECTED: You already clicked the link "${href}" earlier in this session. Clicking it again is not allowed. You MUST choose a DIFFERENT link/selector pointing to content you have not opened yet.`;
+            messages.push({ role: 'assistant', content: responseText });
+            continue;
+          }
+          clickedHrefs.push(href);
+        }
+      }
+
       messages.push({ role: 'assistant', content: responseText });
 
       // Accumulate any data returned in this step
       this.accumulateActionData(accumulatedData, agentAction);
-      this.logger.log(`[${label}] Accumulated data so far: ${JSON.stringify(accumulatedData)}`);
+      this.logger.log(
+        `[${label}] Accumulated data so far: ${JSON.stringify(accumulatedData)}`,
+      );
 
-      this.logger.log(`[${label}] Attempt ${attempt}: thought=${agentAction.thought || 'None'} action=${agentAction.action}`);
+      this.logger.log(
+        `[${label}] Attempt ${attempt}: thought=${agentAction.thought || 'None'} action=${agentAction.action}`,
+      );
 
       if (agentAction.action === 'finish') {
+        // Generic, declarative requirement check — runs for ANY process that supplies finishRequirements
+        if (options.finishRequirements && options.finishRequirements.length > 0) {
+          const missing: string[] = [];
+          for (const req of options.finishRequirements) {
+            const value = accumulatedData[req.field];
+
+            if (req.minValidCount !== undefined) {
+              const arr = Array.isArray(value) ? value : [];
+              const validator = req.itemValidator || this.defaultItemValidator.bind(this);
+              const validCount = arr.filter(validator).length;
+              if (validCount < req.minValidCount) {
+                missing.push(
+                  `"${req.field}" needs at least ${req.minValidCount} valid entries (currently ${validCount} valid). ${req.description || ''}`.trim(),
+                );
+              }
+            } else if (req.required) {
+              const isPresent = typeof value === 'string' ? value.trim().length > 0 : value !== undefined && value !== null;
+              if (!isPresent) {
+                missing.push(`"${req.field}" is required but missing or empty. ${req.description || ''}`.trim());
+              }
+            }
+          }
+
+          if (missing.length > 0) {
+            executionFeedback = `Cannot finish yet — requirements not met:\n${missing.map(m => `- ${m}`).join('\n')}\nContinue the task to satisfy these before calling finish again.`;
+            continue;
+          }
+        }
+
         if (handleFinish) {
           const verdict = await handleFinish(agentAction, attempt, maxAttempts);
           if (!verdict.accept) {
-            executionFeedback = verdict.feedback || "Action outputted 'finish' but was not accepted. Retrying...";
+            executionFeedback =
+              verdict.feedback ||
+              "Action outputted 'finish' but was not accepted. Retrying...";
             continue;
           }
         }
@@ -458,24 +627,34 @@ DATA_SAVED_SO_FAR = ${JSON.stringify(accumulatedData)}`;
 
       try {
         const execResult = await executeAction(agentAction);
-        executionFeedback = execResult.feedback || 'Action executed successfully.';
-        if (agentAction.action === 'click' && typeof agentAction.selector === 'string') {
+        executionFeedback =
+          execResult.feedback || 'Action executed successfully.';
+        if (
+          agentAction.action === 'click' &&
+          typeof agentAction.selector === 'string'
+        ) {
           const sel = agentAction.selector.trim();
           if (sel && !clickedSelectors.includes(sel)) {
             clickedSelectors.push(sel);
           }
         }
       } catch (execErr) {
-        this.logger.error(`[${label}] Action execution failed: ${execErr.message}`);
+        this.logger.error(
+          `[${label}] Action execution failed: ${execErr.message}`,
+        );
         executionFeedback = `Action execution failed: ${execErr.message}. If the element was not found, check the active URL or try a different approach.`;
       }
     }
 
     if (Object.keys(accumulatedData).length > 0) {
-      this.logger.log(`[${label}] Loop ended without finish action, but returning accumulated data: ${JSON.stringify(accumulatedData)}`);
+      this.logger.log(
+        `[${label}] Loop ended without finish action, but returning accumulated data: ${JSON.stringify(accumulatedData)}`,
+      );
       return { action: 'finish', ...accumulatedData };
     }
 
-    throw new Error(`Agent loop [${label}] exceeded max steps (${maxAttempts}) without a finish action and no accumulated data.`);
+    throw new Error(
+      `Agent loop [${label}] exceeded max steps (${maxAttempts}) without a finish action and no accumulated data.`,
+    );
   }
 }

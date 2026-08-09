@@ -22,4 +22,3 @@ export class AgentsService {
     return this.geminiService.generateCompletion(systemPrompt, userPrompt);
   }
 }
-

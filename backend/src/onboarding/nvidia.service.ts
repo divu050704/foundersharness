@@ -6,8 +6,10 @@ import * as path from 'path';
 export class NvidiaService {
   private readonly logger = new Logger(NvidiaService.name);
   private apiKey: string | null = null;
-  private readonly apiUrl = 'https://integrate.api.nvidia.com/v1/chat/completions';
-  private readonly modelName = 'nvidia/llama-3.1-nemotron-70b-instructnvidia/llama-3.1-nemotron-nano-8b-v1';
+  private readonly apiUrl =
+    'https://integrate.api.nvidia.com/v1/chat/completions';
+  private readonly modelName =
+    'nvidia/llama-3.1-nemotron-70b-instructnvidia/llama-3.1-nemotron-nano-8b-v1';
 
   constructor() {
     this.loadEnv();
@@ -25,7 +27,7 @@ export class NvidiaService {
       const cwdPath = path.resolve(process.cwd(), '.env');
       const backendCwdPath = path.resolve(process.cwd(), 'backend/.env');
       const dirnamePath = path.resolve(__dirname, '../../../.env');
-      
+
       let envPath = '';
       if (fs.existsSync(cwdPath)) {
         envPath = cwdPath;
@@ -57,28 +59,33 @@ export class NvidiaService {
     }
   }
 
-  async generateCompletion(systemPrompt: string, userPrompt: string): Promise<string> {
+  async generateCompletion(
+    systemPrompt: string,
+    userPrompt: string,
+  ): Promise<string> {
     if (!this.apiKey) {
       this.loadEnv(); // Retry loading in case key was updated
     }
 
     if (!this.apiKey) {
       this.logger.error('NVIDIA_API_KEY is not configured.');
-      throw new Error('NVIDIA_API_KEY is missing. Please add it to your backend .env file.');
+      throw new Error(
+        'NVIDIA_API_KEY is missing. Please add it to your backend .env file.',
+      );
     }
 
     try {
       const response = await fetch(this.apiUrl, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${this.apiKey}`,
+          Authorization: `Bearer ${this.apiKey}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
           model: this.modelName,
           messages: [
             { role: 'system', content: systemPrompt },
-            { role: 'user', content: userPrompt }
+            { role: 'user', content: userPrompt },
           ],
           temperature: 0.2,
           max_tokens: 1024,
@@ -88,16 +95,22 @@ export class NvidiaService {
 
       if (!response.ok) {
         const errText = await response.text();
-        this.logger.error(`NVIDIA API request failed: Status ${response.status} - ${errText}`);
-        throw new Error(`NVIDIA API response error: ${response.statusText} (${response.status})`);
+        this.logger.error(
+          `NVIDIA API request failed: Status ${response.status} - ${errText}`,
+        );
+        throw new Error(
+          `NVIDIA API response error: ${response.statusText} (${response.status})`,
+        );
       }
 
-      const data = await response.json() as any;
+      const data = await response.json();
       if (data && data.choices && data.choices[0] && data.choices[0].message) {
         return data.choices[0].message.content || '';
       }
 
-      throw new Error('Malformed completion response structure from NVIDIA API.');
+      throw new Error(
+        'Malformed completion response structure from NVIDIA API.',
+      );
     } catch (error) {
       this.logger.error('Error contacting NVIDIA Inference API', error);
       throw error;

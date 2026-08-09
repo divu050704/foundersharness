@@ -1,4 +1,9 @@
-import { Injectable, Logger, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  OnModuleInit,
+  OnModuleDestroy,
+} from '@nestjs/common';
 import WebSocket from 'ws';
 
 @Injectable()
@@ -26,7 +31,7 @@ export class DeviceHookService implements OnModuleInit, OnModuleDestroy {
     }
 
     this.logger.log(`Connecting to device-hook WebSocket at ${this.wsUrl}...`);
-    
+
     try {
       const socket = new WebSocket(this.wsUrl);
       this.ws = socket;
@@ -47,13 +52,18 @@ export class DeviceHookService implements OnModuleInit, OnModuleDestroy {
             }
           }
         } catch (err) {
-          this.logger.error('Failed to parse WebSocket message from device-hook:', err);
+          this.logger.error(
+            'Failed to parse WebSocket message from device-hook:',
+            err,
+          );
         }
       });
 
       socket.on('close', () => {
         this.isConnected = false;
-        this.logger.warn('Connection to device-hook closed. Retrying in 5 seconds...');
+        this.logger.warn(
+          'Connection to device-hook closed. Retrying in 5 seconds...',
+        );
         this.scheduleReconnect();
       });
 
@@ -74,7 +84,10 @@ export class DeviceHookService implements OnModuleInit, OnModuleDestroy {
     }
     if (this.ws) {
       this.ws.removeAllListeners();
-      if (this.ws.readyState === WebSocket.OPEN || this.ws.readyState === WebSocket.CONNECTING) {
+      if (
+        this.ws.readyState === WebSocket.OPEN ||
+        this.ws.readyState === WebSocket.CONNECTING
+      ) {
         this.ws.close();
       }
       this.ws = null;
@@ -105,11 +118,17 @@ export class DeviceHookService implements OnModuleInit, OnModuleDestroy {
     return this.isConnected && this.ws?.readyState === WebSocket.OPEN;
   }
 
-  async sendCommand(action: string, params: Record<string, any> = {}, timeoutMs = 40000): Promise<any> {
+  async sendCommand(
+    action: string,
+    params: Record<string, any> = {},
+    timeoutMs = 40000,
+  ): Promise<any> {
     return new Promise((resolve, reject) => {
       if (!this.isHookConnected()) {
         return reject(
-          new Error('device-hook helper is not running or connected. Please launch the desktop helper app.')
+          new Error(
+            'device-hook helper is not running or connected. Please launch the desktop helper app.',
+          ),
         );
       }
 
@@ -124,14 +143,20 @@ export class DeviceHookService implements OnModuleInit, OnModuleDestroy {
       const timeout = setTimeout(() => {
         if (this.pendingRequests.has(id)) {
           this.pendingRequests.delete(id);
-          reject(new Error(`Command '${action}' timed out after ${timeoutMs / 1000} seconds.`));
+          reject(
+            new Error(
+              `Command '${action}' timed out after ${timeoutMs / 1000} seconds.`,
+            ),
+          );
         }
       }, timeoutMs);
 
       this.pendingRequests.set(id, (response) => {
         clearTimeout(timeout);
         if (response.status === 'error') {
-          reject(new Error(response.message || `Error executing action: ${action}`));
+          reject(
+            new Error(response.message || `Error executing action: ${action}`),
+          );
         } else {
           resolve(response.result);
         }

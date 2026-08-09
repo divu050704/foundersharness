@@ -1,4 +1,9 @@
-import { Injectable, Logger, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  OnModuleInit,
+  OnModuleDestroy,
+} from '@nestjs/common';
 import { MongoClient, Db } from 'mongodb';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -30,7 +35,11 @@ export class MongoDbStore implements OnModuleInit, OnModuleDestroy {
   private client: MongoClient | null = null;
   private db: Db | null = null;
   private isFallbackMode = false;
-  private readonly fallbackPath = path.resolve(process.cwd(), 'data', 'mongodb_fallback.json');
+  private readonly fallbackPath = path.resolve(
+    process.cwd(),
+    'data',
+    'mongodb_fallback.json',
+  );
 
   constructor() {
     this.ensureFallbackDbExists();
@@ -39,8 +48,14 @@ export class MongoDbStore implements OnModuleInit, OnModuleDestroy {
   async onModuleInit() {
     const mongoUri = process.env.MONGODB_URI;
 
-    if (!mongoUri || mongoUri.includes('<username>') || mongoUri.includes('placeholder')) {
-      this.logger.warn('MONGODB_URI is not configured or is a placeholder. Using local JSON fallback mode.');
+    if (
+      !mongoUri ||
+      mongoUri.includes('<username>') ||
+      mongoUri.includes('placeholder')
+    ) {
+      this.logger.warn(
+        'MONGODB_URI is not configured or is a placeholder. Using local JSON fallback mode.',
+      );
       this.isFallbackMode = true;
       return;
     }
@@ -53,15 +68,20 @@ export class MongoDbStore implements OnModuleInit, OnModuleDestroy {
       });
       await this.client.connect();
       this.db = this.client.db();
-      
+
       // Ping check
       await this.db.command({ ping: 1 });
       this.logger.log('Successfully connected to MongoDB Atlas database!');
-      
+
       // Ensure indexes for efficient queries
-      await this.db.collection('entities').createIndex({ type: 1, name: 1 }, { unique: true });
+      await this.db
+        .collection('entities')
+        .createIndex({ type: 1, name: 1 }, { unique: true });
     } catch (error) {
-      this.logger.error('Failed to connect to MongoDB Atlas. Falling back to local storage mode.', error);
+      this.logger.error(
+        'Failed to connect to MongoDB Atlas. Falling back to local storage mode.',
+        error,
+      );
       this.isFallbackMode = true;
       this.client = null;
       this.db = null;
@@ -90,7 +110,10 @@ export class MongoDbStore implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  private readFallback(): { company: CompanyRecord | null; entities: EntityRecord[] } {
+  private readFallback(): {
+    company: CompanyRecord | null;
+    entities: EntityRecord[];
+  } {
     try {
       this.ensureFallbackDbExists();
       const content = fs.readFileSync(this.fallbackPath, 'utf8');
@@ -101,10 +124,17 @@ export class MongoDbStore implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  private writeFallback(data: { company: CompanyRecord | null; entities: EntityRecord[] }) {
+  private writeFallback(data: {
+    company: CompanyRecord | null;
+    entities: EntityRecord[];
+  }) {
     try {
       this.ensureFallbackDbExists();
-      fs.writeFileSync(this.fallbackPath, JSON.stringify(data, null, 2), 'utf8');
+      fs.writeFileSync(
+        this.fallbackPath,
+        JSON.stringify(data, null, 2),
+        'utf8',
+      );
     } catch (e) {
       this.logger.error('Failed to write fallback storage', e);
     }
@@ -118,7 +148,9 @@ export class MongoDbStore implements OnModuleInit, OnModuleDestroy {
     }
 
     try {
-      const company = await this.db.collection<CompanyRecord>('company').findOne({});
+      const company = await this.db
+        .collection<CompanyRecord>('company')
+        .findOne({});
       return company;
     } catch (error) {
       this.logger.error('MongoDB error in getCompany', error);
@@ -127,7 +159,9 @@ export class MongoDbStore implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  async updateCompany(companyData: Partial<CompanyRecord>): Promise<CompanyRecord> {
+  async updateCompany(
+    companyData: Partial<CompanyRecord>,
+  ): Promise<CompanyRecord> {
     if (this.isFallbackMode || !this.db) {
       const db = this.readFallback();
       const current = db.company || {
@@ -144,7 +178,7 @@ export class MongoDbStore implements OnModuleInit, OnModuleDestroy {
     }
 
     try {
-      const current = await this.getCompany() || {
+      const current = (await this.getCompany()) || {
         name: 'My Startup',
         product: '',
         stage: '',
@@ -153,10 +187,12 @@ export class MongoDbStore implements OnModuleInit, OnModuleDestroy {
         tools: [],
       };
       const updated = { ...current, ...companyData };
-      
+
       // Update or insert (UPSERT)
-      await this.db.collection('company').replaceOne({}, updated, { upsert: true });
-      return updated as CompanyRecord;
+      await this.db
+        .collection('company')
+        .replaceOne({}, updated, { upsert: true });
+      return updated;
     } catch (error) {
       this.logger.error('MongoDB error in updateCompany', error);
       // Fallback update as safety net
@@ -179,23 +215,29 @@ export class MongoDbStore implements OnModuleInit, OnModuleDestroy {
     if (this.isFallbackMode || !this.db) {
       const db = this.readFallback();
       const entity = db.entities.find(
-        (e) => e.type.toLowerCase() === type.toLowerCase() && e.name.toLowerCase() === name.toLowerCase(),
+        (e) =>
+          e.type.toLowerCase() === type.toLowerCase() &&
+          e.name.toLowerCase() === name.toLowerCase(),
       );
       return entity || null;
     }
 
     try {
       // Case-insensitive search on type and name
-      const entity = await this.db.collection<EntityRecord>('entities').findOne({
-        type: { $regex: new RegExp(`^${type}$`, 'i') },
-        name: { $regex: new RegExp(`^${name}$`, 'i') },
-      });
+      const entity = await this.db
+        .collection<EntityRecord>('entities')
+        .findOne({
+          type: { $regex: new RegExp(`^${type}$`, 'i') },
+          name: { $regex: new RegExp(`^${name}$`, 'i') },
+        });
       return entity;
     } catch (error) {
       this.logger.error('MongoDB error in getEntity', error);
       const db = this.readFallback();
       const entity = db.entities.find(
-        (e) => e.type.toLowerCase() === type.toLowerCase() && e.name.toLowerCase() === name.toLowerCase(),
+        (e) =>
+          e.type.toLowerCase() === type.toLowerCase() &&
+          e.name.toLowerCase() === name.toLowerCase(),
       );
       return entity || null;
     }
@@ -220,7 +262,9 @@ export class MongoDbStore implements OnModuleInit, OnModuleDestroy {
     if (this.isFallbackMode || !this.db) {
       const db = this.readFallback();
       const index = db.entities.findIndex(
-        (e) => e.type.toLowerCase() === type.toLowerCase() && e.name.toLowerCase() === name.toLowerCase(),
+        (e) =>
+          e.type.toLowerCase() === type.toLowerCase() &&
+          e.name.toLowerCase() === name.toLowerCase(),
       );
 
       if (index !== -1) {
@@ -240,8 +284,12 @@ export class MongoDbStore implements OnModuleInit, OnModuleDestroy {
 
     try {
       const current = await this.getEntity(type, name);
-      const mergedRecord = current 
-        ? { ...current, ...newRecord, data: { ...current.data, ...newRecord.data } }
+      const mergedRecord = current
+        ? {
+            ...current,
+            ...newRecord,
+            data: { ...current.data, ...newRecord.data },
+          }
         : newRecord;
 
       // Remove mongodb internal _id if it exists to prevent modifications on immutable fields
@@ -261,7 +309,9 @@ export class MongoDbStore implements OnModuleInit, OnModuleDestroy {
       // Fallback
       const db = this.readFallback();
       const index = db.entities.findIndex(
-        (e) => e.type.toLowerCase() === type.toLowerCase() && e.name.toLowerCase() === name.toLowerCase(),
+        (e) =>
+          e.type.toLowerCase() === type.toLowerCase() &&
+          e.name.toLowerCase() === name.toLowerCase(),
       );
       if (index !== -1) {
         db.entities[index] = {
@@ -283,20 +333,29 @@ export class MongoDbStore implements OnModuleInit, OnModuleDestroy {
     if (this.isFallbackMode || !this.db) {
       const db = this.readFallback();
       if (type) {
-        return db.entities.filter((e) => e.type.toLowerCase() === type.toLowerCase());
+        return db.entities.filter(
+          (e) => e.type.toLowerCase() === type.toLowerCase(),
+        );
       }
       return db.entities;
     }
 
     try {
-      const query = type ? { type: { $regex: new RegExp(`^${type}$`, 'i') } } : {};
-      const entities = await this.db.collection<EntityRecord>('entities').find(query).toArray();
+      const query = type
+        ? { type: { $regex: new RegExp(`^${type}$`, 'i') } }
+        : {};
+      const entities = await this.db
+        .collection<EntityRecord>('entities')
+        .find(query)
+        .toArray();
       return entities;
     } catch (error) {
       this.logger.error('MongoDB error in listEntities', error);
       const db = this.readFallback();
       if (type) {
-        return db.entities.filter((e) => e.type.toLowerCase() === type.toLowerCase());
+        return db.entities.filter(
+          (e) => e.type.toLowerCase() === type.toLowerCase(),
+        );
       }
       return db.entities;
     }

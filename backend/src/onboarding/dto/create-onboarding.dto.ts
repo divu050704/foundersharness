@@ -12,4 +12,3 @@ export class CreateOnboardingDto {
   11?: string;
   12?: string;
 }
-

@@ -14,7 +14,11 @@ export interface TimelineEvent {
 @Injectable()
 export class TimelineStore {
   private readonly logger = new Logger(TimelineStore.name);
-  private readonly dbPath = path.resolve(process.cwd(), 'data', 'timeline.json');
+  private readonly dbPath = path.resolve(
+    process.cwd(),
+    'data',
+    'timeline.json',
+  );
 
   constructor() {
     this.ensureDbExists();

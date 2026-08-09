@@ -83,9 +83,11 @@ export class QdrantStore {
     if (queryTokens.length === 0) return db.documents.slice(0, limit);
 
     // Compute TF-IDF vector space
-    const corpus = db.documents.map((d) => this.tokenize(d.content + ' ' + d.title));
+    const corpus = db.documents.map((d) =>
+      this.tokenize(d.content + ' ' + d.title),
+    );
     const vocab = Array.from(new Set(corpus.flat()));
-    
+
     // Calculate Document Frequency (DF) for IDF calculation
     const df: Record<string, number> = {};
     vocab.forEach((term) => {
@@ -150,7 +152,10 @@ export class QdrantStore {
       .filter((token) => token.length > 2); // filter out small stop-like words
   }
 
-  private cosineSimilarity(vecA: Record<string, number>, vecB: Record<string, number>): number {
+  private cosineSimilarity(
+    vecA: Record<string, number>,
+    vecB: Record<string, number>,
+  ): number {
     let dotProduct = 0;
     let normA = 0;
     let normB = 0;

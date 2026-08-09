@@ -18,7 +18,7 @@ Provide:
 1. MVP Scope refinement: What core features should be built first?
 2. Product Roadblock mitigations: How to bypass the bottlenecks mentioned.
 3. 90-Day Roadmap milestones.`;
-  }
+  },
 };
 
 export const MarketingContentAgent: Agent = {
@@ -37,7 +37,7 @@ Provide:
 1. Ideal Customer Profile (ICP) segmentation.
 2. 3 actionable, low-cost marketing channels to acquire the first 100 users.
 3. A high-converting messaging hook / value proposition headline.`;
-  }
+  },
 };
 
 export const OperationsAgent: Agent = {
@@ -57,7 +57,7 @@ Provide:
 1. Specific automation blueprints (e.g. "When X happens in Notion, trigger Y in Slack").
 2. Team collaboration guidelines for their async / hybrid setup.
 3. Tool stack recommendations to optimize speed.`;
-  }
+  },
 };
 
 export const LeanCanvasAgent: Agent = {
@@ -100,10 +100,10 @@ Output ONLY raw JSON. Do NOT include markdown code block wrappers (no \`\`\`json
     const slowingDown = answers[5];
     const team = answers[6];
     const tools = answers[7];
-    const automate = answers[8] || "operations";
-    const successSixMonths = answers[9] || "launching beta";
-    const assistFirst = answers[10] || ["Product Strategy", "Operations"];
-    const customDetails = answers[11] || "None";
+    const automate = answers[8] || 'operations';
+    const successSixMonths = answers[9] || 'launching beta';
+    const assistFirst = answers[10] || ['Product Strategy', 'Operations'];
+    const customDetails = answers[11] || 'None';
 
     const founderProfile = {
       product: {
@@ -126,7 +126,9 @@ Output ONLY raw JSON. Do NOT include markdown code block wrappers (no \`\`\`json
       operations: {
         toolsUsedDaily: Array.isArray(tools) ? tools : [tools],
         repetitiveTasksToAutomate: automate,
-        aiWorkspaceAssistanceFocus: Array.isArray(assistFirst) ? assistFirst : [assistFirst],
+        aiWorkspaceAssistanceFocus: Array.isArray(assistFirst)
+          ? assistFirst
+          : [assistFirst],
       },
       additionalContext: customDetails,
     };
@@ -136,7 +138,7 @@ Output ONLY raw JSON. Do NOT include markdown code block wrappers (no \`\`\`json
 ${JSON.stringify(founderProfile, null, 2)}
 
 Using this data, generate a complete, sector-appropriate Lean Canvas for this company. Ensure every section reflects the specific stage, priorities, and bottlenecks described above rather than generic startup boilerplate.`;
-  }
+  },
 };
 
 export const SocialMediaAgent: Agent = {
@@ -181,18 +183,21 @@ Response: {"thought": "The page is still loading, I should wait for a moment.", 
 Injected Hint: "${platformHint}"
 
 Inspect the active URL and the accessibility element tree, and output your next action as a valid JSON object.`;
-  }
+  },
 };
 
 export const AGENT_MAP: Record<string, Agent> = {
   'Product Strategy': ProductStrategyAgent,
   'Marketing & Content': MarketingContentAgent,
-  'Operations': OperationsAgent,
+  Operations: OperationsAgent,
   'Lean Canvas': LeanCanvasAgent,
   'Social Media': SocialMediaAgent,
 };
 
 export const getAgentById = (id: string): Agent | undefined => {
-  return Object.values(AGENT_MAP).find(agent => agent.id === id || agent.name === id) || AGENT_MAP[id];
+  return (
+    Object.values(AGENT_MAP).find(
+      (agent) => agent.id === id || agent.name === id,
+    ) || AGENT_MAP[id]
+  );
 };
-

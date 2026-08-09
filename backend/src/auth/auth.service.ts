@@ -21,7 +21,7 @@ export class AuthService {
       const cwdPath = path.resolve(process.cwd(), '.env');
       const backendCwdPath = path.resolve(process.cwd(), 'backend/.env');
       const dirnamePath = path.resolve(__dirname, '../../../.env');
-      
+
       let envPath = '';
       if (fs.existsSync(cwdPath)) {
         envPath = cwdPath;
@@ -49,7 +49,10 @@ export class AuthService {
         }
       }
     } catch (e) {
-      this.logger.warn('Failed to load GOOGLE_CLIENT_ID from local .env file', e);
+      this.logger.warn(
+        'Failed to load GOOGLE_CLIENT_ID from local .env file',
+        e,
+      );
     }
   }
 
@@ -66,14 +69,18 @@ export class AuthService {
       if (!response.ok) {
         const errText = await response.text();
         this.logger.error(`Google token validation failed: ${errText}`);
-        throw new UnauthorizedException('Invalid Google token signature or expired');
+        throw new UnauthorizedException(
+          'Invalid Google token signature or expired',
+        );
       }
 
-      const payload = await response.json() as any;
+      const payload = await response.json();
 
       // Verify the audience (client ID) if configured in our environment
       if (this.googleClientId && payload.aud !== this.googleClientId) {
-        this.logger.error(`Google token audience mismatch: Token aud=${payload.aud}, Expected clientID=${this.googleClientId}`);
+        this.logger.error(
+          `Google token audience mismatch: Token aud=${payload.aud}, Expected clientID=${this.googleClientId}`,
+        );
         throw new UnauthorizedException('Token audience mismatch');
       }
 
@@ -91,7 +98,10 @@ export class AuthService {
         user: {
           email,
           name,
-          avatar: name.split(' ').map((n: string) => n[0]).join(''),
+          avatar: name
+            .split(' ')
+            .map((n: string) => n[0])
+            .join(''),
           picture,
         },
         onboarded: isSarah,

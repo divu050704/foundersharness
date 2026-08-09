@@ -1,4 +1,14 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, HttpCode, HttpStatus } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
+  HttpCode,
+  HttpStatus,
+} from '@nestjs/common';
 import { OnboardingService } from './onboarding.service';
 import { CreateOnboardingDto } from './dto/create-onboarding.dto';
 
@@ -11,6 +21,4 @@ export class OnboardingController {
   create(@Body() createOnboardingDto: CreateOnboardingDto) {
     return this.onboardingService.create(createOnboardingDto);
   }
-
-  
 }

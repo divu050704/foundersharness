@@ -29,10 +29,15 @@ export class MemoryExtractionPipeline {
     category: 'onboarding' | 'meeting' | 'pitch' | 'note',
     metadata: Record<string, any> = {},
   ): Promise<any> {
-    this.logger.log(`Ingesting document into Memory Extraction Pipeline: "${title}" (${category})`);
+    this.logger.log(
+      `Ingesting document into Memory Extraction Pipeline: "${title}" (${category})`,
+    );
 
     // 1. Store original file in Object Storage
-    const { fileId } = await this.objectStorage.storeFile(`${category}_${title}.txt`, content);
+    const { fileId } = await this.objectStorage.storeFile(
+      `${category}_${title}.txt`,
+      content,
+    );
     metadata.fileId = fileId;
 
     // 2. Index in Vector Database (Qdrant) for unstructured retrieval
@@ -98,9 +103,11 @@ ${content}`;
         userPrompt,
         { type: 'json_object' },
       );
-      
+
       const extracted = this.parseRobustJson(aiResponse);
-      this.logger.log('Successfully extracted structured facts using Gemini LLM');
+      this.logger.log(
+        'Successfully extracted structured facts using Gemini LLM',
+      );
 
       // 4. Update MongoDB Atlas store
       if (extracted.postgres) {
@@ -155,9 +162,11 @@ ${content}`;
         success: true,
         extracted,
       };
-
     } catch (error) {
-      this.logger.error('Failed to parse or save extracted memory structures', error);
+      this.logger.error(
+        'Failed to parse or save extracted memory structures',
+        error,
+      );
       return {
         success: false,
         error: error.message,
@@ -167,29 +176,35 @@ ${content}`;
 
   private parseRobustJson(text: string): any {
     let clean = text.trim();
-    
+
     // Strip markdown code block wrappers if present
     const firstBrace = clean.indexOf('{');
     const lastBrace = clean.lastIndexOf('}');
     if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
       clean = clean.substring(firstBrace, lastBrace + 1);
     }
-    
+
     // Remove trailing commas before closing braces/brackets
     clean = clean.replace(/,\s*([\]}])/g, '$1');
-    
+
     try {
       return JSON.parse(clean);
     } catch (e) {
-      this.logger.warn('Failed to parse JSON directly. Attempting diagnostic log...');
+      this.logger.warn(
+        'Failed to parse JSON directly. Attempting diagnostic log...',
+      );
       const errorPositionMatch = e.message.match(/at position (\d+)/);
       if (errorPositionMatch) {
         const pos = parseInt(errorPositionMatch[1], 10);
         const snippetStart = Math.max(0, pos - 50);
         const snippetEnd = Math.min(clean.length, pos + 50);
-        this.logger.error(`JSON Parse error around index ${pos}: "...${clean.substring(snippetStart, snippetEnd)}..."`);
+        this.logger.error(
+          `JSON Parse error around index ${pos}: "...${clean.substring(snippetStart, snippetEnd)}..."`,
+        );
       } else {
-        this.logger.error(`JSON Parse error: ${e.message}. Raw text size: ${clean.length}`);
+        this.logger.error(
+          `JSON Parse error: ${e.message}. Raw text size: ${clean.length}`,
+        );
       }
       throw e;
     }

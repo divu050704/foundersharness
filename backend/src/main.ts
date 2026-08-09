@@ -9,7 +9,7 @@ function bootstrapEnv() {
     const cwdPath = path.resolve(process.cwd(), '.env');
     const backendCwdPath = path.resolve(process.cwd(), 'backend/.env');
     const dirnamePath = path.resolve(__dirname, '../../.env');
-    
+
     let envPath = '';
     if (fs.existsSync(cwdPath)) {
       envPath = cwdPath;
@@ -49,13 +49,13 @@ bootstrapEnv();
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
-  
+
   // Enable CORS for frontend integration
   app.enableCors({
     origin: process.env.FRONTEND_URL || 'http://localhost:3000',
     credentials: true,
   });
-  
+
   // Set global API prefix
   app.setGlobalPrefix('api');
 

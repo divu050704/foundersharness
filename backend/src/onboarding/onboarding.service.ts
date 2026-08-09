@@ -13,12 +13,15 @@ export class OnboardingService {
     private readonly memoryService: MemoryService,
   ) {}
 
-  async create(createOnboardingDto: CreateOnboardingDto) {   
+  async create(createOnboardingDto: CreateOnboardingDto) {
     let canvas: any = null;
 
     try {
-      const aiResponse = await this.agentsService.executeAgent('lean-canvas', createOnboardingDto);
-      
+      const aiResponse = await this.agentsService.executeAgent(
+        'lean-canvas',
+        createOnboardingDto,
+      );
+
       let cleanJson = aiResponse.trim();
       console.log(cleanJson);
       // Robust JSON extraction to strip preamble/conversational text surrounding the JSON block
@@ -27,13 +30,19 @@ export class OnboardingService {
       if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
         cleanJson = cleanJson.substring(firstBrace, lastBrace + 1);
       } else if (cleanJson.startsWith('```')) {
-        cleanJson = cleanJson.replace(/^```(json)?\n/, '').replace(/\n```$/, '').trim();
+        cleanJson = cleanJson
+          .replace(/^```(json)?\n/, '')
+          .replace(/\n```$/, '')
+          .trim();
       }
 
       canvas = JSON.parse(cleanJson);
       this.logger.log('Successfully generated AI Lean Canvas');
     } catch (error) {
-      this.logger.warn('Failed to generate AI Lean Canvas, using fallback', error);
+      this.logger.warn(
+        'Failed to generate AI Lean Canvas, using fallback',
+        error,
+      );
     }
 
     // Connect to Memory Extraction Pipeline
@@ -60,7 +69,7 @@ Team Setup:
 ${createOnboardingDto[6] || 'Not specified'}
 
 Daily Tools:
-${Array.isArray(createOnboardingDto[7]) ? createOnboardingDto[7].join(', ') : (createOnboardingDto[7] || 'None')}
+${Array.isArray(createOnboardingDto[7]) ? createOnboardingDto[7].join(', ') : createOnboardingDto[7] || 'None'}
 
 Repetitive Tasks to Automate:
 - ${createOnboardingDto[8] || 'Not specified'}
@@ -69,7 +78,7 @@ Success In 6 Months:
 - ${createOnboardingDto[9] || 'Not specified'}
 
 AI Focus Areas:
-${Array.isArray(createOnboardingDto[10]) ? createOnboardingDto[10].join(', ') : (createOnboardingDto[10] || 'None')}
+${Array.isArray(createOnboardingDto[10]) ? createOnboardingDto[10].join(', ') : createOnboardingDto[10] || 'None'}
 
 Additional Context:
 ${createOnboardingDto[11] || 'None'}
@@ -86,16 +95,23 @@ ${createOnboardingDto[11] || 'None'}
 - Revenue Streams: ${canvas?.revenueStreams ? canvas.revenueStreams.join(' | ') : 'None'}
 `;
 
-      this.logger.log('Triggering Memory Extraction Pipeline for Onboarding data...');
+      this.logger.log(
+        'Triggering Memory Extraction Pipeline for Onboarding data...',
+      );
       await this.memoryService.ingestDocument(
         'Founder Onboarding Profile',
         onboardingText.trim(),
         'onboarding',
         { stage: createOnboardingDto[3] },
       );
-      this.logger.log('Memory Extraction Pipeline completed for Onboarding data');
+      this.logger.log(
+        'Memory Extraction Pipeline completed for Onboarding data',
+      );
     } catch (e) {
-      this.logger.error('Failed to run Memory Extraction Pipeline on onboarding data', e);
+      this.logger.error(
+        'Failed to run Memory Extraction Pipeline on onboarding data',
+        e,
+      );
     }
 
     return {
@@ -120,4 +136,3 @@ ${createOnboardingDto[11] || 'None'}
     return `This action removes a #${id} onboarding`;
   }
 }
-

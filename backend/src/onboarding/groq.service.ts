@@ -15,7 +15,12 @@ export interface AgentLoopOptions {
   /** System prompt sent to the model for every step of this loop. */
   systemPrompt: string;
   /** Builds the user-turn prompt for a given step from the latest state + feedback. */
-  buildUserPrompt: (step: number, maxSteps: number, state: any, feedback: string | null) => string;
+  buildUserPrompt: (
+    step: number,
+    maxSteps: number,
+    state: any,
+    feedback: string | null,
+  ) => string;
   /** Fetches whatever "world state" (e.g. browser state) should be shown to the model each step. */
   getState: () => Promise<any>;
   /** Executes a non-"finish" action returned by the model. Throw to signal failure (fed back as feedback). */
@@ -24,7 +29,11 @@ export interface AgentLoopOptions {
    * Optional gate on "finish" actions - e.g. to reject low-confidence finishes and retry.
    * If omitted, any "finish" action is accepted immediately.
    */
-  handleFinish?: (action: any, step: number, maxSteps: number) => Promise<AgentFinishVerdict>;
+  handleFinish?: (
+    action: any,
+    step: number,
+    maxSteps: number,
+  ) => Promise<AgentFinishVerdict>;
   maxSteps?: number;
   responseFormat?: { type: 'json_object' };
   /** Optional label used in log lines to distinguish concurrent/different agent loops. */
@@ -95,7 +104,9 @@ export class GroqService {
 
     if (!this.apiKey) {
       this.logger.error('GROQ_API_KEY is not configured.');
-      throw new Error('GROQ_API_KEY is missing. Please add it to your backend .env file.');
+      throw new Error(
+        'GROQ_API_KEY is missing. Please add it to your backend .env file.',
+      );
     }
 
     try {
@@ -112,13 +123,12 @@ export class GroqService {
       if (responseFormat) {
         payload.response_format = responseFormat;
       }
-      console.log(systemPrompt, userPrompt, responseFormat)
-
+      console.log(systemPrompt, userPrompt, responseFormat);
 
       const response = await fetch(this.apiUrl, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${this.apiKey}`,
+          Authorization: `Bearer ${this.apiKey}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(payload),
@@ -126,11 +136,15 @@ export class GroqService {
 
       if (!response.ok) {
         const errText = await response.text();
-        this.logger.error(`Groq API request failed: Status ${response.status} - ${errText}`);
-        throw new Error(`Groq API response error: ${response.statusText} (${response.status})`);
+        this.logger.error(
+          `Groq API request failed: Status ${response.status} - ${errText}`,
+        );
+        throw new Error(
+          `Groq API response error: ${response.statusText} (${response.status})`,
+        );
       }
 
-      const data = (await response.json()) as any;
+      const data = await response.json();
       if (data && data.choices && data.choices[0] && data.choices[0].message) {
         return data.choices[0].message.content || '';
       }
@@ -166,27 +180,42 @@ export class GroqService {
 
     for (let step = 1; step <= maxSteps; step++) {
       const state = await getState();
-      const userPrompt = buildUserPrompt(step, maxSteps, state, executionFeedback);
+      const userPrompt = buildUserPrompt(
+        step,
+        maxSteps,
+        state,
+        executionFeedback,
+      );
       executionFeedback = null;
 
-      this.logger.log(`[${label}] Step ${step}/${maxSteps}: requesting next action...`);
-      const responseText = await this.generateCompletion(systemPrompt, userPrompt, responseFormat);
-      
+      this.logger.log(
+        `[${label}] Step ${step}/${maxSteps}: requesting next action...`,
+      );
+      const responseText = await this.generateCompletion(
+        systemPrompt,
+        userPrompt,
+        responseFormat,
+      );
+
       let cleanedResponse = responseText.trim();
       const mdMatch = cleanedResponse.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
       if (mdMatch) {
         cleanedResponse = mdMatch[1].trim();
       }
-      
+
       const agentAction = JSON.parse(cleanedResponse);
 
-      this.logger.log(`[${label}] Step ${step}: thought=${agentAction.thought || 'None'} action=${agentAction.action}`);
+      this.logger.log(
+        `[${label}] Step ${step}: thought=${agentAction.thought || 'None'} action=${agentAction.action}`,
+      );
 
       if (agentAction.action === 'finish') {
         if (handleFinish) {
           const verdict = await handleFinish(agentAction, step, maxSteps);
           if (!verdict.accept) {
-            executionFeedback = verdict.feedback || "Action outputted 'finish' but was not accepted. Retrying...";
+            executionFeedback =
+              verdict.feedback ||
+              "Action outputted 'finish' but was not accepted. Retrying...";
             continue;
           }
         }
@@ -195,13 +224,18 @@ export class GroqService {
 
       try {
         const execResult = await executeAction(agentAction);
-        executionFeedback = execResult.feedback || 'Action executed successfully.';
+        executionFeedback =
+          execResult.feedback || 'Action executed successfully.';
       } catch (execErr) {
-        this.logger.error(`[${label}] Action execution failed: ${execErr.message}`);
+        this.logger.error(
+          `[${label}] Action execution failed: ${execErr.message}`,
+        );
         executionFeedback = `Action execution failed: ${execErr.message}. If the element was not found, check the active URL or try a different approach.`;
       }
     }
 
-    throw new Error(`Agent loop [${label}] exceeded max steps (${maxSteps}) without a finish action.`);
+    throw new Error(
+      `Agent loop [${label}] exceeded max steps (${maxSteps}) without a finish action.`,
+    );
   }
 }

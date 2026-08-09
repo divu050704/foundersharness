@@ -1,4 +1,13 @@
-import { Controller, Get, Post, Body, Query, Delete, HttpCode, HttpStatus } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Query,
+  Delete,
+  HttpCode,
+  HttpStatus,
+} from '@nestjs/common';
 import { MemoryService } from './memory.service';
 
 @Controller('memory')
@@ -59,6 +68,9 @@ export class MemoryController {
   @HttpCode(HttpStatus.OK)
   async reset() {
     await this.memoryService.resetMemory();
-    return { success: true, message: 'Simulated memory system reset successfully.' };
+    return {
+      success: true,
+      message: 'Simulated memory system reset successfully.',
+    };
   }
 }

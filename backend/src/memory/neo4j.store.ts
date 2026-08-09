@@ -60,7 +60,9 @@ export class Neo4jStore {
 
   async addNode(node: GraphNode): Promise<void> {
     const db = this.readDb();
-    const index = db.nodes.findIndex((n) => n.id.toLowerCase() === node.id.toLowerCase());
+    const index = db.nodes.findIndex(
+      (n) => n.id.toLowerCase() === node.id.toLowerCase(),
+    );
     if (index !== -1) {
       db.nodes[index] = {
         ...db.nodes[index],
@@ -79,7 +81,7 @@ export class Neo4jStore {
     properties: Record<string, any> = {},
   ): Promise<void> {
     const db = this.readDb();
-    
+
     // Ensure source and target nodes exist (create default placeholder if missing)
     const sourceId = source.trim();
     const targetId = target.trim();
@@ -112,7 +114,7 @@ export class Neo4jStore {
   async getRelated(entityName: string): Promise<any[]> {
     const db = this.readDb();
     const searchId = entityName.toLowerCase();
-    
+
     const results: any[] = [];
 
     // Find outgoing relationships

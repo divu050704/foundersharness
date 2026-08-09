@@ -8,7 +8,13 @@ import { SocialMediaModule } from './social/social.module';
 import { MemoryModule } from './memory/memory.module';
 
 @Module({
-  imports: [OnboardingModule, AgentsModule, AuthModule, SocialMediaModule, MemoryModule],
+  imports: [
+    OnboardingModule,
+    AgentsModule,
+    AuthModule,
+    SocialMediaModule,
+    MemoryModule,
+  ],
   controllers: [AppController],
   providers: [AppService],
 })

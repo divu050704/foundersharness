@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { DeviceHookService } from './device-hook.service';
-import { GeminiService } from '../onboarding/gemini.service';
+import { GeminiService, PipelineStage, PipelineContext } from '../onboarding/gemini.service';
 import { getAgentById } from '../agents/instances';
 import { MemoryService } from '../memory/memory.service';
 import { MongoClient } from 'mongodb';
@@ -14,8 +14,10 @@ interface SessionStatus {
 }
 
 const PLATFORM_HINTS: Record<string, string> = {
-  instagram: 'Look for a "Messages" or "Direct" link and a profile avatar in the nav; logged-out shows "Log in"/"Sign up" buttons.',
-  linkedin: 'Look for "Home", "My Network", "Jobs", "Messaging" nav items and a profile photo; logged-out shows a "Sign in" button.',
+  instagram:
+    'Look for a "Messages" or "Direct" link and a profile avatar in the nav; logged-out shows "Log in"/"Sign up" buttons.',
+  linkedin:
+    'Look for "Home", "My Network", "Jobs", "Messaging" nav items and a profile photo; logged-out shows a "Sign in" button.',
 };
 
 const SCRAPE_PLATFORM_HINTS: Record<string, string> = {
@@ -55,12 +57,15 @@ const SCRAPE_PLATFORM_HINTS: Record<string, string> = {
 #     # Call "finish" action with all accumulated "posts" (between 5 and 7) and the "bio".`,
 };
 
+import { BrowserPipelineService } from './browser-pipeline.service';
+
 @Injectable()
 export class SocialMediaService {
   private readonly logger = new Logger(SocialMediaService.name);
 
   constructor(
     private readonly deviceHookService: DeviceHookService,
+    private readonly browserPipelineService: BrowserPipelineService,
     private readonly geminiService: GeminiService,
     private readonly memoryService: MemoryService,
   ) { }
@@ -69,23 +74,13 @@ export class SocialMediaService {
     return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
-    /**
+  /**
    * Extracts a structured, noise-filtered representation of the page's accessibility
    * elements. This is the platform-agnostic "state" every agent loop reasons over.
    */
 
   private async getBrowserState(): Promise<{ url: string; elements: string }> {
-    try {
-      const url = await this.deviceHookService.sendCommand('evaluate', {
-        script: 'window.location.href',
-      });
-
-      const rawElements = await this.deviceHookService.sendCommand('content');
-      return { url: url || '', elements: rawElements };
-    } catch (err) {
-      this.logger.error('Failed to get browser state:', err.message);
-      return { url: '', elements: '' };
-    }
+    return this.browserPipelineService.getBrowserState();
   }
 
   /** Shared user-prompt builder for the browser-state-driven agent loops. */
@@ -100,66 +95,56 @@ export class SocialMediaService {
   }
 
   /** Shared navigate/click/wait executor used by the browser-driving agent loops. */
-  private async executeBrowserAction(action: any, opts: { navigateTimeoutMs?: number; clickTimeoutMs?: number } = {}) {
-    const { navigateTimeoutMs = 15000, clickTimeoutMs = 35000 } = opts;
-
-    if (action.action === 'navigate') {
-      if (!action.url) throw new Error('"url" is required for navigate action.');
-      await this.deviceHookService.sendCommand('navigate', { url: action.url }, navigateTimeoutMs);
-      await this.sleep(4000);
-      return { feedback: `Successfully navigated to: ${action.url}` };
-    }
-    if (action.action === 'click') {
-      if (!action.selector) throw new Error('"selector" is required for click action.');
-      await this.deviceHookService.sendCommand('click', { selector: action.selector }, clickTimeoutMs);
-      await this.sleep(2000);
-      return { feedback: `Successfully clicked selector: "${action.selector}"` };
-    }
-    if (action.action === 'fill') {
-      if (!action.selector || action.text === undefined) {
-        throw new Error('Both "selector" and "text" are required for fill action.');
-      }
-      await this.deviceHookService.sendCommand('fill', { selector: action.selector, text: action.text }, 10000);
-      await this.sleep(2000);
-      return { feedback: `Successfully filled selector: "${action.selector}"` };
-    }
-    if (action.action === 'wait') {
-      const waitMs = action.ms || 2000;
-      await this.sleep(waitMs);
-      return { feedback: `Successfully waited for ${waitMs}ms.` };
-    }
-
-    throw new Error(`Unknown action type "${action.action}".`);
+  private async executeBrowserAction(
+    action: any,
+    opts: { navigateTimeoutMs?: number; clickTimeoutMs?: number } = {},
+  ) {
+    return this.browserPipelineService.executeBrowserAction(action, opts);
   }
 
   /**
    * Runs the Gemini ReAct agent loop to verify the login session for a platform.
    */
-  async verifySession(platform: 'linkedin' | 'instagram'): Promise<SessionStatus> {
+  async verifySession(
+    platform: 'linkedin' | 'instagram',
+  ): Promise<SessionStatus> {
     if (!this.deviceHookService.isHookConnected()) {
-      return { connected: false, error: 'device-hook desktop helper is not connected. Please open it.' };
+      return {
+        connected: false,
+        error: 'device-hook desktop helper is not connected. Please open it.',
+      };
     }
 
     this.deviceHookService.setActiveSessionName(platform + '_session');
 
     const agent = getAgentById('social-media');
     if (!agent) {
-      return { connected: false, error: 'Social Media Agent template not found in backend configuration.' };
+      return {
+        connected: false,
+        error:
+          'Social Media Agent template not found in backend configuration.',
+      };
     }
 
     this.logger.log(`Starting session verification for ${platform}...`);
-    const targetUrl = platform === 'linkedin'
-      ? 'https://www.linkedin.com/feed/'
-      : 'https://www.instagram.com/';
+    const targetUrl =
+      platform === 'linkedin'
+        ? 'https://www.linkedin.com/feed/'
+        : 'https://www.instagram.com/';
 
     try {
       await this.deviceHookService.sendCommand('navigate', { url: targetUrl });
       await this.sleep(4000);
     } catch (err) {
-      return { connected: false, error: `Failed to navigate to ${platform}: ${err.message}` };
+      return {
+        connected: false,
+        error: `Failed to navigate to ${platform}: ${err.message}`,
+      };
     }
 
-    const platformHint = PLATFORM_HINTS[platform] || 'Analyze general authenticated vs login screen components.';
+    const platformHint =
+      PLATFORM_HINTS[platform] ||
+      'Analyze general authenticated vs login screen components.';
 
     try {
       const result = await this.geminiService.runAgentLoop({
@@ -168,16 +153,32 @@ export class SocialMediaService {
         maxAttempts: 3,
         getState: () => this.getBrowserState(),
         buildUserPrompt: (attempt, maxAttempts, state, feedback) =>
-          this.buildBrowserUserPrompt(`${agent.generatePrompt({ platform, platformHint })}\n      `, attempt, maxAttempts, state, feedback),
+          this.buildBrowserUserPrompt(
+            `${agent.generatePrompt({ platform, platformHint })}\n      `,
+            attempt,
+            maxAttempts,
+            state,
+            feedback,
+          ),
         handleFinish: async (action, attempt, maxAttempts) => {
           if (action.confidence === 'low' && attempt < maxAttempts) {
-            this.logger.warn(`Agent returned 'low' confidence status: ${action.reasoning || 'Wait requested'}. Waiting 3s to retry...`);
+            this.logger.warn(
+              `Agent returned 'low' confidence status: ${action.reasoning || 'Wait requested'}. Waiting 3s to retry...`,
+            );
             await this.sleep(3000);
-            return { accept: false, feedback: "Action outputted 'finish' with low confidence. Retrying verification check..." };
+            return {
+              accept: false,
+              feedback:
+                "Action outputted 'finish' with low confidence. Retrying verification check...",
+            };
           }
           return { accept: true };
         },
-        executeAction: (action) => this.executeBrowserAction(action, { navigateTimeoutMs: 15000, clickTimeoutMs: 35000 }),
+        executeAction: (action) =>
+          this.executeBrowserAction(action, {
+            navigateTimeoutMs: 15000,
+            clickTimeoutMs: 35000,
+          }),
       });
 
       return {
@@ -193,14 +194,23 @@ export class SocialMediaService {
   /**
    * Runs the Gemini agent loop to post content on a platform.
    */
-  async postContent(platform: 'linkedin' | 'instagram', content: string): Promise<{ success: boolean; message: string }> {
+  async postContent(
+    platform: 'linkedin' | 'instagram',
+    content: string,
+  ): Promise<{ success: boolean; message: string }> {
     if (!this.deviceHookService.isHookConnected()) {
-      return { success: false, message: 'device-hook desktop helper is not connected. Please open it.' };
+      return {
+        success: false,
+        message: 'device-hook desktop helper is not connected. Please open it.',
+      };
     }
 
     const session = await this.verifySession(platform);
     if (!session.connected) {
-      return { success: false, message: `Not logged into ${platform}. Please log in first in the agent browser.` };
+      return {
+        success: false,
+        message: `Not logged into ${platform}. Please log in first in the agent browser.`,
+      };
     }
 
     this.logger.log(`Starting content posting for ${platform}...`);
@@ -208,7 +218,8 @@ export class SocialMediaService {
     if (platform === 'instagram') {
       return {
         success: false,
-        message: 'Instagram posts require uploading an image/video. Automatic text-only posting is not supported by Instagram. Please use LinkedIn for text posts.',
+        message:
+          'Instagram posts require uploading an image/video. Automatic text-only posting is not supported by Instagram. Please use LinkedIn for text posts.',
       };
     }
 
@@ -244,8 +255,18 @@ Rules:
         maxAttempts: 3,
         getState: () => this.getBrowserState(),
         buildUserPrompt: (attempt, maxAttempts, state, feedback) =>
-          this.buildBrowserUserPrompt('', attempt, maxAttempts, state, feedback),
-        executeAction: (action) => this.executeBrowserAction(action, { navigateTimeoutMs: 15000, clickTimeoutMs: 35000 }),
+          this.buildBrowserUserPrompt(
+            '',
+            attempt,
+            maxAttempts,
+            state,
+            feedback,
+          ),
+        executeAction: (action) =>
+          this.executeBrowserAction(action, {
+            navigateTimeoutMs: 15000,
+            clickTimeoutMs: 35000,
+          }),
       });
 
       return {
@@ -254,11 +275,78 @@ Rules:
       };
     } catch (err) {
       this.logger.error(`Error in posting for ${platform}:`, err);
-      return { success: false, message: `Agent posting failed: ${err.message}` };
+      return {
+        success: false,
+        message: `Agent posting failed: ${err.message}`,
+      };
     }
   }
 
-  private readonly calendarFallbackPath = path.resolve(process.cwd(), 'data', 'social_calendar.json');
+  private readonly calendarFallbackPath = path.resolve(
+    process.cwd(),
+    'data',
+    'social_calendar.json',
+  );
+
+
+
+  private buildInstagramScrapeStages(): PipelineStage[] {
+    return [
+      {
+        stage: 'step1_navigate_to_profile',
+        isActive: (ctx: PipelineContext) => !ctx.visitedUrls.some((u: string) => {
+          const pathStr = u.replace('https://www.instagram.com', '').replace('https://instagram.com', '');
+          return pathStr.length > 1 && !pathStr.startsWith('/p/') && !pathStr.startsWith('/direct/') && !pathStr.startsWith('/reels/') && !pathStr.startsWith('/explore/');
+        }),
+        instruction: () => 'Locate the link/avatar for the user\'s own profile (usually the "Profile" nav item or account avatar linking to "/<username>/"), then click or navigate there.'
+      },
+      {
+        stage: 'step2_scrape_bio',
+        isActive: (ctx: PipelineContext) => !(typeof ctx.accumulatedData.bio === 'string' && ctx.accumulatedData.bio.trim().length > 0),
+        instruction: () => 'Extract the bio text near the top of the profile page. Save it in the "bio" field. DO NOT call "finish" yet.'
+      },
+      {
+        stage: 'step3_scrape_posts_sequentially',
+        isActive: (ctx: PipelineContext) => (Array.isArray(ctx.accumulatedData.posts) ? ctx.accumulatedData.posts.length : 0) < 5,
+        instruction: (ctx: PipelineContext) => {
+          const postCount = Array.isArray(ctx.accumulatedData.posts) ? ctx.accumulatedData.posts.length : 0;
+          return `Currently saved ${postCount} posts. Click and scrape Post #${postCount + 1}.
+1. You MUST be on the profile page to click a post.
+2. Pick a post whose ID is NOT already opened.
+3. Read the caption and append it to the "posts" array.
+4. Close/navigate back to the profile before clicking the next post.`;
+        }
+      },
+      {
+        stage: 'step4_finish',
+        isActive: () => true,
+        instruction: (ctx: PipelineContext) => `Scraped ${ctx.accumulatedData.posts?.length ?? 0} posts. Call "finish" with the accumulated "posts" and "bio".`
+      },
+    ];
+  }
+
+  private buildLinkedinScrapeStages(): PipelineStage[] {
+    return [
+      {
+        stage: 'step1_navigate_to_recent_activity',
+        isActive: (ctx: PipelineContext) => !ctx.visitedUrls.some((u: string) => u.includes('/recent-activity/')),
+        instruction: () => 'Navigate to "https://www.linkedin.com/in/me/recent-activity/all/".'
+      },
+      {
+        stage: 'step3_extract_posts',
+        isActive: (ctx: PipelineContext) => (Array.isArray(ctx.accumulatedData.posts) ? ctx.accumulatedData.posts.length : 0) < 5,
+        instruction: (ctx: PipelineContext) => {
+          const postCount = Array.isArray(ctx.accumulatedData.posts) ? ctx.accumulatedData.posts.length : 0;
+          return `Currently saved ${postCount} posts. Extract the text of the user's most recent original posts (skip reposts/comments) and append to "posts".`;
+        }
+      },
+      {
+        stage: 'step4_finish',
+        isActive: () => true,
+        instruction: (ctx: PipelineContext) => `Scraped ${ctx.accumulatedData.posts?.length ?? 0} posts. Call "finish" with "posts".`
+      },
+    ];
+  }
 
   /**
    * Retrieves past posts (and bio, for Instagram) from connected social accounts using
@@ -267,61 +355,76 @@ Rules:
    * of assuming a raw "content" scrape already returns structured data.
    * Falls back to simulated posts if there's no device hook, or nothing could be extracted.
    */
-  async getPastPosts(platform: 'linkedin' | 'instagram'): Promise<{ posts: string[]; bio?: string }> {
-    // if (!this.deviceHookService.isHookConnected()) {
-    //   return { posts: this.getSimulatedPastPosts(platform) };
-    // }
-
+  async getPastPosts(
+    platform: 'linkedin' | 'instagram',
+  ): Promise<{ posts: string[]; bio?: string }> {
     try {
-      const targetUrl = platform === 'linkedin'
+      const stages = platform === 'instagram'
+        ? this.buildInstagramScrapeStages()
+        : this.buildLinkedinScrapeStages();
+
+      const startUrl = platform === 'linkedin'
         ? 'https://www.linkedin.com/in/me/recent-activity/all/'
         : 'https://www.instagram.com/';
 
-      await this.deviceHookService.sendCommand('navigate', { url: targetUrl });
-      await this.sleep(3000);
+      const systemPrompt = `You are a browser automation agent scraping past ${platform} content for the current logged-in user.
 
-      const hint = SCRAPE_PLATFORM_HINTS[platform];
-      const systemPrompt = `You are a browser automation agent whose job is to scrape past ${platform} content (5 to 7 posts) for the current logged-in user.
-        ${hint}
+You can execute the following JSON actions:
+1. Navigate: {"action": "navigate", "url": "..."}
+2. Click: {"action": "click", "selector": "..."}
+3. Wait: {"action": "wait", "ms": 2000}
+4. Finish: {"action": "finish", "posts": [...], "bio": "optional"}
 
-        You can execute the following JSON actions:
-        1. Navigate: {"action": "navigate", "url": "...", "step": "current step in the instruction or the next step if current completed as step_<number>"}
-        2. Click: {"action": "click", "selector": "...", "step": "current step in the instruction or the next step if current completed as step_<number>"}
-        3. Wait: {"action": "wait", "ms": 2000, "step": "current step in the instruction or the next step if current completed as step_<number>"}
-        4. Finish: {"action": "finish", "posts": ["post text 1", "post text 2", ...], "bio": "optional bio text", "step": "current step in the instruction or the next step if current completed as step_<number>"}
+Rules:
+- Respond ONLY with ONE valid JSON action object.
+- Do not click the same selector/link twice — check CLICKED_SELECTORS_OR_LINKS.
+- The "posts" array must contain the ACTUAL CAPTION TEXT of each post, extracted from the accessibility tree after opening it. NEVER put a URL, href, path, or selector into "posts" — that is a hard rule.
+- Only add an entry to "posts" AFTER you have actually opened that post and read its caption text.
+- Do not call "finish" until at least 5 valid caption texts are scraped, unless no posts exist at all.`;
 
-        Rules:
-        - Respond ONLY with a valid JSON object matching one of the actions above.
-        - Avoid Repeated Clicks: Inspect the CLICKED_SELECTORS_OR_LINKS array variable provided in your prompt checkpoint state. DO NOT click the exact same selector/element again. Choose a different selector/element for subsequent posts.
-        - Prefer reading text directly from the accessibility elements tree over clicking whenever possible.
-        - DO NOT call "finish" early. You must scrape at least 5 posts (up to 7 posts) before calling "finish". You are only allowed to finish with 0 posts if there are absolutely no post links present on the profile page after navigating.
-        - Only call "finish" once you have completed the sequential post scraping pipeline. Never call "finish" immediately after step2_scrape_bio().`;
+      const finishRequirements = platform === 'instagram'
+        ? [
+            { field: 'posts', minValidCount: 5, description: 'Each entry must be actual caption text, not a URL.' },
+            { field: 'bio', required: true, description: 'Extracted from the profile page.' },
+          ]
+        : [
+            { field: 'posts', minValidCount: 5, description: 'Each entry must be actual post text, not a URL.' },
+          ];
 
-      const result = await this.geminiService.runAgentLoop({
+      const result = await this.browserPipelineService.run({
         label: `scrape-posts:${platform}`,
         systemPrompt,
+        stages: stages,
+        startUrl,
         maxAttempts: 20,
-        getState: () => this.getBrowserState(),
-        buildUserPrompt: (attempt, maxAttempts, state, feedback) =>
-          this.buildBrowserUserPrompt('', attempt, maxAttempts, state, feedback),
-        executeAction: (action) => this.executeBrowserAction(action, { navigateTimeoutMs: 15000, clickTimeoutMs: 35000 }),
+        finishRequirements,
       });
+
       const posts = Array.isArray(result.posts)
-        ? result.posts.filter((p: any) => typeof p === 'string' && p.trim().length > 0)
+        ? result.posts.filter(
+            (p: any) => typeof p === 'string' && p.trim().length > 0,
+          )
         : [];
-      const bio = typeof result.bio === 'string' && result.bio.trim().length > 0 ? result.bio : undefined;
+      const bio =
+        typeof result.bio === 'string' && result.bio.trim().length > 0
+          ? result.bio
+          : undefined;
 
       if (posts.length > 0 || bio) {
-        this.logger.log(`Successfully scraped ${platform} via agent loop. Posts: ${posts.length}${bio ? `, bio present` : ''}`);
+        this.logger.log(
+          `Successfully scraped ${platform} via agent loop. Posts: ${posts.length}${bio ? `, bio present` : ''}`,
+        );
         return { posts, bio };
       }
     } catch (e) {
-      this.logger.warn(`Failed to scrape past posts/profile from ${platform} via agent loop. Falling back to default list.`, e);
+      this.logger.warn(
+        `Failed to scrape past posts/profile from ${platform} via agent loop. Falling back to default list.`,
+        e,
+      );
     }
 
     return { posts: [] };
   }
-
 
   private cleanAndParseJson(raw: string): any {
     let clean = raw.trim();
@@ -340,11 +443,11 @@ Rules:
       let startIndex = -1;
       let endIndex = -1;
       const firstChar = clean.match(/[\[{]/);
-      
+
       if (firstChar) {
         const targetOpen = firstChar[0];
         const targetClose = targetOpen === '[' ? ']' : '}';
-        
+
         for (let i = 0; i < clean.length; i++) {
           const char = clean[i];
           if (char === '\\') {
@@ -390,7 +493,9 @@ Rules:
   async generateCalendar(platform: 'linkedin' | 'instagram'): Promise<any[]> {
     this.logger.log(`Generating 7-day post calendar for ${platform}...`);
 
-    const context = await this.memoryService.buildContext('company profile goals priorities');
+    const context = await this.memoryService.buildContext(
+      'company profile goals priorities',
+    );
     const { posts: pastPosts, bio } = await this.getPastPosts(platform);
 
     let bioContext = '';
@@ -453,7 +558,10 @@ Your output MUST be a valid JSON array of objects with exactly this structure (n
 
   async getCalendar(): Promise<any[]> {
     const mongoUri = process.env.MONGODB_URI;
-    const hasMongo = mongoUri && !mongoUri.includes('<username>') && !mongoUri.includes('placeholder');
+    const hasMongo =
+      mongoUri &&
+      !mongoUri.includes('<username>') &&
+      !mongoUri.includes('placeholder');
 
     if (!hasMongo) {
       try {
@@ -475,7 +583,10 @@ Your output MUST be a valid JSON array of objects with exactly this structure (n
       await client.close();
       return docs;
     } catch (error) {
-      this.logger.error('Failed to read calendar from MongoDB Atlas, checking fallback', error);
+      this.logger.error(
+        'Failed to read calendar from MongoDB Atlas, checking fallback',
+        error,
+      );
       try {
         if (fs.existsSync(this.calendarFallbackPath)) {
           const content = fs.readFileSync(this.calendarFallbackPath, 'utf8');
@@ -494,13 +605,20 @@ Your output MUST be a valid JSON array of objects with exactly this structure (n
       if (!fs.existsSync(dir)) {
         fs.mkdirSync(dir, { recursive: true });
       }
-      fs.writeFileSync(this.calendarFallbackPath, JSON.stringify(calendar, null, 2), 'utf8');
+      fs.writeFileSync(
+        this.calendarFallbackPath,
+        JSON.stringify(calendar, null, 2),
+        'utf8',
+      );
     } catch (e) {
       this.logger.error('Failed to save calendar to local fallback', e);
     }
 
     const mongoUri = process.env.MONGODB_URI;
-    const hasMongo = mongoUri && !mongoUri.includes('<username>') && !mongoUri.includes('placeholder');
+    const hasMongo =
+      mongoUri &&
+      !mongoUri.includes('<username>') &&
+      !mongoUri.includes('placeholder');
 
     if (hasMongo) {
       try {
@@ -520,11 +638,18 @@ Your output MUST be a valid JSON array of objects with exactly this structure (n
     }
   }
 
-  private readonly sessionsFallbackPath = path.resolve(process.cwd(), 'data', 'browser_sessions.json');
+  private readonly sessionsFallbackPath = path.resolve(
+    process.cwd(),
+    'data',
+    'browser_sessions.json',
+  );
 
   async getBrowserSessions(): Promise<string[]> {
     const mongoUri = process.env.MONGODB_URI;
-    const hasMongo = mongoUri && !mongoUri.includes('<username>') && !mongoUri.includes('placeholder');
+    const hasMongo =
+      mongoUri &&
+      !mongoUri.includes('<username>') &&
+      !mongoUri.includes('placeholder');
 
     let savedSessions: string[] = [];
 
@@ -546,7 +671,10 @@ Your output MUST be a valid JSON array of objects with exactly this structure (n
         await client.close();
         savedSessions = docs.map((doc) => doc.name);
       } catch (error) {
-        this.logger.error('Failed to read sessions from MongoDB Atlas, checking fallback', error);
+        this.logger.error(
+          'Failed to read sessions from MongoDB Atlas, checking fallback',
+          error,
+        );
         try {
           if (fs.existsSync(this.sessionsFallbackPath)) {
             const content = fs.readFileSync(this.sessionsFallbackPath, 'utf8');
@@ -558,11 +686,15 @@ Your output MUST be a valid JSON array of objects with exactly this structure (n
       }
     }
 
-    return Array.from(new Set(savedSessions.filter((s) => s && s !== 'default')));
+    return Array.from(
+      new Set(savedSessions.filter((s) => s && s !== 'default')),
+    );
   }
 
   async saveBrowserSession(sessionName: string): Promise<void> {
-    const cleanName = (sessionName || '').trim().replace(/[^a-zA-Z0-9_-]/g, '_');
+    const cleanName = (sessionName || '')
+      .trim()
+      .replace(/[^a-zA-Z0-9_-]/g, '_');
     if (!cleanName || cleanName === 'default') return;
 
     const current = await this.getBrowserSessions();
@@ -575,60 +707,95 @@ Your output MUST be a valid JSON array of objects with exactly this structure (n
       if (!fs.existsSync(dir)) {
         fs.mkdirSync(dir, { recursive: true });
       }
-      fs.writeFileSync(this.sessionsFallbackPath, JSON.stringify(updated, null, 2), 'utf8');
+      fs.writeFileSync(
+        this.sessionsFallbackPath,
+        JSON.stringify(updated, null, 2),
+        'utf8',
+      );
     } catch (e) {
       this.logger.error('Failed to save sessions to local fallback', e);
     }
 
     const mongoUri = process.env.MONGODB_URI;
-    const hasMongo = mongoUri && !mongoUri.includes('<username>') && !mongoUri.includes('placeholder');
+    const hasMongo =
+      mongoUri &&
+      !mongoUri.includes('<username>') &&
+      !mongoUri.includes('placeholder');
 
     if (hasMongo) {
       try {
         const client = new MongoClient(mongoUri);
         await client.connect();
         const db = client.db();
-        await db.collection('browser_sessions').updateOne(
-          { name: cleanName },
-          { $set: { name: cleanName, createdAt: new Date() } },
-          { upsert: true },
-        );
+        await db
+          .collection('browser_sessions')
+          .updateOne(
+            { name: cleanName },
+            { $set: { name: cleanName, createdAt: new Date() } },
+            { upsert: true },
+          );
         await client.close();
-        this.logger.log(`Session profile '${cleanName}' registered in MongoDB Atlas.`);
+        this.logger.log(
+          `Session profile '${cleanName}' registered in MongoDB Atlas.`,
+        );
       } catch (error) {
-        this.logger.error('Failed to save session profile to MongoDB Atlas', error);
+        this.logger.error(
+          'Failed to save session profile to MongoDB Atlas',
+          error,
+        );
       }
     }
   }
 
-  async launchBrowser(sessionName: string): Promise<{ success: boolean; message: string }> {
+  async launchBrowser(
+    sessionName: string,
+  ): Promise<{ success: boolean; message: string }> {
     if (!this.deviceHookService.isHookConnected()) {
-      return { success: false, message: 'device-hook desktop helper is not connected.' };
+      return {
+        success: false,
+        message: 'device-hook desktop helper is not connected.',
+      };
     }
     try {
-      const cleanName = (sessionName || 'default').trim().replace(/[^a-zA-Z0-9_-]/g, '_');
+      const cleanName = (sessionName || 'default')
+        .trim()
+        .replace(/[^a-zA-Z0-9_-]/g, '_');
       this.deviceHookService.setActiveSessionName(cleanName);
-      await this.deviceHookService.sendCommand('launch', { sessionName: cleanName });
+      await this.deviceHookService.sendCommand('launch', {
+        sessionName: cleanName,
+      });
 
       if (cleanName !== 'default') {
         await this.saveBrowserSession(cleanName);
       }
 
-      return { success: true, message: `Browser persistent session '${cleanName}' launched successfully.` };
+      return {
+        success: true,
+        message: `Browser persistent session '${cleanName}' launched successfully.`,
+      };
     } catch (err) {
-      return { success: false, message: `Failed to launch browser: ${err.message}` };
+      return {
+        success: false,
+        message: `Failed to launch browser: ${err.message}`,
+      };
     }
   }
 
   async closeBrowser(): Promise<{ success: boolean; message: string }> {
     if (!this.deviceHookService.isHookConnected()) {
-      return { success: false, message: 'device-hook desktop helper is not connected.' };
+      return {
+        success: false,
+        message: 'device-hook desktop helper is not connected.',
+      };
     }
     try {
       await this.deviceHookService.sendCommand('close');
       return { success: true, message: 'Browser closed successfully.' };
     } catch (err) {
-      return { success: false, message: `Failed to close browser: ${err.message}` };
+      return {
+        success: false,
+        message: `Failed to close browser: ${err.message}`,
+      };
     }
   }
 

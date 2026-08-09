@@ -81,22 +81,48 @@ export class MemoryService {
   /**
    * Add a direct graph node
    */
-  async addNode(id: string, label: string, properties: Record<string, any> = {}) {
+  async addNode(
+    id: string,
+    label: string,
+    properties: Record<string, any> = {},
+  ) {
     return this.neo4jStore.addNode({ id, label, properties });
   }
 
   /**
    * Add a direct graph relationship
    */
-  async addRelationship(source: string, relation: string, target: string, properties: Record<string, any> = {}) {
-    return this.neo4jStore.addRelationship(source, relation, target, properties);
+  async addRelationship(
+    source: string,
+    relation: string,
+    target: string,
+    properties: Record<string, any> = {},
+  ) {
+    return this.neo4jStore.addRelationship(
+      source,
+      relation,
+      target,
+      properties,
+    );
   }
 
   /**
    * Add a direct timeline event
    */
-  async addTimelineEvent(date: string, title: string, description: string, confidence = 1.0, source = 'Manual') {
-    return this.timelineStore.addEvent({ date, title, description, confidence, source });
+  async addTimelineEvent(
+    date: string,
+    title: string,
+    description: string,
+    confidence = 1.0,
+    source = 'Manual',
+  ) {
+    return this.timelineStore.addEvent({
+      date,
+      title,
+      description,
+      confidence,
+      source,
+    });
   }
 
   /**
@@ -126,16 +152,19 @@ export class MemoryService {
     await this.neo4jStore.clear();
     await this.timelineStore.clear();
     await this.mongodbStore.clear();
-    
+
     // Reset local fallback and vector store files
     const fs = require('fs');
     const path = require('path');
     const fbPath = path.resolve(process.cwd(), 'data', 'mongodb_fallback.json');
     const qdPath = path.resolve(process.cwd(), 'data', 'qdrant.json');
-    
-    fs.writeFileSync(fbPath, JSON.stringify({ company: null, entities: [] }, null, 2));
+
+    fs.writeFileSync(
+      fbPath,
+      JSON.stringify({ company: null, entities: [] }, null, 2),
+    );
     fs.writeFileSync(qdPath, JSON.stringify({ documents: [] }, null, 2));
-    
+
     // Clear storage folder files
     const storageDir = path.resolve(process.cwd(), 'data', 'storage');
     if (fs.existsSync(storageDir)) {
