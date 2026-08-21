@@ -11,6 +11,7 @@ import { auth } from './auth'; // your betterAuth(...) instance
 import { SocialMediaModule } from './social/social.module';
 import { MemoryModule } from './memory/memory.module';
 import { MongooseModule } from '@nestjs/mongoose';
+import { UserModule } from './user/user.module';
 
 @Module({
   imports: [
@@ -29,6 +30,7 @@ import { MongooseModule } from '@nestjs/mongoose';
     AuthModule.forRoot(auth), // ← pass your auth instance here
     SocialMediaModule,
     MemoryModule,
+    UserModule,
   ],
   controllers: [AppController],
   providers: [AppService],

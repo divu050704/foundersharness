@@ -70,7 +70,7 @@ export default function LoginPage() {
     try {
       await authClient.signIn.social({
         provider: "google",
-        callbackURL: `${process.env.NEXT_PUBLIC_APP_URL}/dashboard`,
+        callbackURL: `/api/user`,
       });
     } catch (error) {
       console.error("Google authentication error:", error);

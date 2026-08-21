@@ -1,3 +1,4 @@
+import { CreateOnboardingDto } from "../onboarding/dto/create-onboarding.dto";
 export interface Agent {
   id: string;
   name: string;

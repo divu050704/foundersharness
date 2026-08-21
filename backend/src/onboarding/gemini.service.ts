@@ -205,7 +205,7 @@ export class GeminiService {
         throw new Error('Malformed completion response structure.');
       } catch (error) {
         this.logger.warn(
-          `Error generating completion with model ${model}: ${error.message}`,
+          `Error generating completion with model ${model}: ${error instanceof Error ? error.message : String(error)}`,
         );
         lastError = error;
       }

@@ -2,7 +2,6 @@ import { Injectable, Logger } from '@nestjs/common';
 import { GeminiService } from '../onboarding/gemini.service';
 import { MongoDbStore } from './mongodb.store';
 import { Neo4jStore } from './neo4j.store';
-import { QdrantStore } from './qdrant.store';
 import { TimelineStore } from './timeline.store';
 import { ObjectStorage } from './object.storage';
 
@@ -14,7 +13,6 @@ export class MemoryExtractionPipeline {
     private readonly geminiService: GeminiService,
     private readonly mongodbStore: MongoDbStore,
     private readonly neo4jStore: Neo4jStore,
-    private readonly qdrantStore: QdrantStore,
     private readonly timelineStore: TimelineStore,
     private readonly objectStorage: ObjectStorage,
   ) {}
@@ -39,9 +37,6 @@ export class MemoryExtractionPipeline {
       content,
     );
     metadata.fileId = fileId;
-
-    // 2. Index in Vector Database (Qdrant) for unstructured retrieval
-    await this.qdrantStore.addDocument(title, content, category, metadata);
 
     // 3. Extract structured memory via LLM
     try {

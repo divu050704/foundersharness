@@ -29,6 +29,7 @@ export const api = {
       },
       body: JSON.stringify(data),
       ...options,
+      credentials: "include"
     });
     if (!res.ok) {
       throw new Error(`API Error: ${res.status} ${res.statusText}`);

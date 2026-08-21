@@ -8,6 +8,7 @@ import {
   Delete,
   HttpCode,
   HttpStatus,
+  Redirect,
 } from '@nestjs/common';
 import { OnboardingService } from './onboarding.service';
 import { CreateOnboardingDto } from './dto/create-onboarding.dto';
@@ -19,6 +20,7 @@ export class OnboardingController {
   @Post()
   @HttpCode(HttpStatus.CREATED)
   create(@Body() createOnboardingDto: CreateOnboardingDto) {
+  
     return this.onboardingService.create(createOnboardingDto);
   }
 }

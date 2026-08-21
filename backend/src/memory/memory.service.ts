@@ -1,7 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { MongoDbStore } from './mongodb.store';
 import { Neo4jStore } from './neo4j.store';
-import { QdrantStore } from './qdrant.store';
 import { TimelineStore } from './timeline.store';
 import { ContextBuilder } from './context.builder';
 import { MemoryExtractionPipeline } from './pipeline.service';
@@ -13,7 +12,6 @@ export class MemoryService {
   constructor(
     private readonly mongodbStore: MongoDbStore,
     private readonly neo4jStore: Neo4jStore,
-    private readonly qdrantStore: QdrantStore,
     private readonly timelineStore: TimelineStore,
     private readonly contextBuilder: ContextBuilder,
     private readonly pipeline: MemoryExtractionPipeline,
@@ -41,10 +39,10 @@ export class MemoryService {
   }
 
   /**
-   * Qdrant (Vector Database) search for unstructured information
+   * Search for unstructured information (Qdrant removed)
    */
   async search(query: string, limit?: number) {
-    return this.qdrantStore.search(query, limit);
+    return [];
   }
 
   /**
@@ -153,17 +151,15 @@ export class MemoryService {
     await this.timelineStore.clear();
     await this.mongodbStore.clear();
 
-    // Reset local fallback and vector store files
+    // Reset local fallback store file
     const fs = require('fs');
     const path = require('path');
     const fbPath = path.resolve(process.cwd(), 'data', 'mongodb_fallback.json');
-    const qdPath = path.resolve(process.cwd(), 'data', 'qdrant.json');
 
     fs.writeFileSync(
       fbPath,
       JSON.stringify({ company: null, entities: [] }, null, 2),
     );
-    fs.writeFileSync(qdPath, JSON.stringify({ documents: [] }, null, 2));
 
     // Clear storage folder files
     const storageDir = path.resolve(process.cwd(), 'data', 'storage');

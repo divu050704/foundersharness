@@ -49,6 +49,11 @@ const generateLocalCanvasFallback = (answers) => {
       priorities && priorities !== "[Skipped]" ? `Focusing execution on: ${priorities}` : "Accelerating core product iteration and MVP validation",
       "Deploying AI co-pilots for optimized team workflows"
     ],
+    uniqueValueProposition: [
+      whatBuilding && whatBuilding !== "[Skipped]" ? `Next-generation approach to: ${whatBuilding.split('.')[0]}` : "State-of-the-art startup enablement",
+      "Tailored workspace environment integrated directly with founder workflows",
+      "Actionable, real-time strategy recommendations generated from startup performance data"
+    ],
     uvp: [
       whatBuilding && whatBuilding !== "[Skipped]" ? `Next-generation approach to: ${whatBuilding.split('.')[0]}` : "State-of-the-art startup enablement",
       "Tailored workspace environment integrated directly with founder workflows",
@@ -343,7 +348,7 @@ export default function Onboarding() {
     let apiSummary = "";
 
     try {
-      const response = await api.post("/onboarding", answers);
+      const response = await api.post("/api/onboarding", answers);
       if (response && response.canvas) {
         apiResponse = response.canvas;
         apiSummary = response.summary || "";
@@ -367,7 +372,7 @@ export default function Onboarding() {
     }, 3800);
   };
 
-  const handleFinishOnboarding = (finalCanvasData) => {
+  const handleFinishOnboarding = async (finalCanvasData) => {
     const userJson = localStorage.getItem("founder_user");
     if (userJson) {
       try {
@@ -381,6 +386,7 @@ export default function Onboarding() {
     if (finalCanvasData) {
       localStorage.setItem("founder_canvas_data", JSON.stringify(finalCanvasData));
     }
+    await api.post("/api/user", canvasData)
     router.push("/dashboard");
   };
 

@@ -1,7 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { MongoDbStore } from './mongodb.store';
 import { Neo4jStore } from './neo4j.store';
-import { QdrantStore } from './qdrant.store';
 import { TimelineStore } from './timeline.store';
 
 @Injectable()
@@ -11,12 +10,11 @@ export class ContextBuilder {
   constructor(
     private readonly mongodbStore: MongoDbStore,
     private readonly neo4jStore: Neo4jStore,
-    private readonly qdrantStore: QdrantStore,
     private readonly timelineStore: TimelineStore,
   ) {}
 
   /**
-   * Retrieves relevant memory records from all memory modules (Mongo, Neo4j, Qdrant, Timeline)
+   * Retrieves relevant memory records from memory modules (Mongo, Neo4j, Timeline)
    * and formats them into a single context payload ready for LLM consumption.
    */
   async buildContext(query: string): Promise<string> {
@@ -24,9 +22,6 @@ export class ContextBuilder {
 
     // 1. Get structured company overview from MongoDB
     const company = await this.mongodbStore.getCompany();
-
-    // 2. Query Qdrant for semantic matches
-    const relevantDocs = await this.qdrantStore.search(query, 4);
 
     // 3. Query MongoDB for entities related to query keywords
     const allEntities = await this.mongodbStore.listEntities();
@@ -112,16 +107,7 @@ export class ContextBuilder {
       contextStr += '\n';
     }
 
-    // D. Unstructured Passages (Vector DB)
-    if (relevantDocs.length > 0) {
-      contextStr += `## Relevant Unstructured Information (Vector Search)\n`;
-      relevantDocs.forEach((doc, idx) => {
-        contextStr += `[Match #${idx + 1}] Title: ${doc.title} | Category: ${doc.category} | Date: ${doc.createdAt}\n`;
-        contextStr += `Excerpt: "${doc.content}"\n\n`;
-      });
-    }
-
-    // E. Timeline Events
+    // D. Timeline Events
     if (timelineEvents.length > 0) {
       contextStr += `## Chronological Timeline\n`;
       timelineEvents.forEach((ev) => {

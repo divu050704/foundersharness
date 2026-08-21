@@ -21,17 +21,90 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 
+const ensureArray = (val) => {
+  if (Array.isArray(val)) return val.filter((item) => typeof item === "string" ? item.trim() !== "" : item != null);
+  if (typeof val === "string" && val.trim()) {
+    if (val.includes("\n")) {
+      return val.split("\n").map((s) => s.replace(/^[•\-\*\d+\.]\s*/, "").trim()).filter(Boolean);
+    }
+    return [val.trim()];
+  }
+  return [];
+};
+
+const normalizeCanvasData = (data) => {
+  if (!data) return {};
+  const uvpVal = data.uniqueValueProposition || data.uvp || [];
+  return {
+    problem: ensureArray(data.problem),
+    solution: ensureArray(data.solution),
+    keyMetrics: ensureArray(data.keyMetrics),
+    uniqueValueProposition: ensureArray(uvpVal),
+    uvp: ensureArray(uvpVal),
+    unfairAdvantage: ensureArray(data.unfairAdvantage),
+    channels: ensureArray(data.channels),
+    customerSegments: ensureArray(data.customerSegments),
+    costStructure: ensureArray(data.costStructure),
+    revenueStreams: ensureArray(data.revenueStreams),
+  };
+};
+
+const BOX_TITLES = {
+  problem: "Problem",
+  solution: "Solution",
+  keyMetrics: "Key Metrics",
+  uniqueValueProposition: "Unique Value Proposition",
+  uvp: "Unique Value Proposition",
+  unfairAdvantage: "Unfair Advantage",
+  channels: "Channels",
+  customerSegments: "Customer Segments",
+  costStructure: "Cost Structure",
+  revenueStreams: "Revenue Streams",
+};
+
 export default function LeanCanvasView({
   canvasData: initialCanvasData,
   summaryText,
   onFinish,
 }) {
-  const [canvasData, setCanvasData] = useState(initialCanvasData);
+  const [canvasData, setCanvasData] = useState(() => normalizeCanvasData(initialCanvasData));
   const [showSummaryBriefing, setShowSummaryBriefing] = useState(false);
   const [editingBox, setEditingBox] = useState(null);
 
   const handleSaveAndFinish = () => {
     onFinish(canvasData);
+  };
+
+  const updateBoxItem = (boxKey, index, value) => {
+    const list = [...(canvasData[boxKey] || [])];
+    list[index] = value;
+    const isUvp = boxKey === "uniqueValueProposition" || boxKey === "uvp";
+    setCanvasData((prev) => ({
+      ...prev,
+      [boxKey]: list,
+      ...(isUvp ? { uniqueValueProposition: list, uvp: list } : {}),
+    }));
+  };
+
+  const removeBoxItem = (boxKey, index) => {
+    const list = (canvasData[boxKey] || []).filter((_, i) => i !== index);
+    const isUvp = boxKey === "uniqueValueProposition" || boxKey === "uvp";
+    setCanvasData((prev) => ({
+      ...prev,
+      [boxKey]: list,
+      ...(isUvp ? { uniqueValueProposition: list, uvp: list } : {}),
+    }));
+  };
+
+  const addBoxItem = (boxKey) => {
+    const currentList = canvasData[boxKey] || [];
+    const list = [...currentList, "New canvas item"];
+    const isUvp = boxKey === "uniqueValueProposition" || boxKey === "uvp";
+    setCanvasData((prev) => ({
+      ...prev,
+      [boxKey]: list,
+      ...(isUvp ? { uniqueValueProposition: list, uvp: list } : {}),
+    }));
   };
 
   return (
@@ -156,7 +229,7 @@ export default function LeanCanvasView({
 
         {/* Box 3: Unique Value Proposition */}
         <div 
-          onClick={() => setEditingBox("uvp")}
+          onClick={() => setEditingBox("uniqueValueProposition")}
           className="md:col-span-1 border border-border bg-card rounded p-4 flex flex-col justify-between min-h-[300px] cursor-pointer hover:border-primary/50 group transition-all animate-in fade-in zoom-in-95 duration-300 delay-150"
         >
           <div className="space-y-3.5">
@@ -168,7 +241,7 @@ export default function LeanCanvasView({
               <Pencil className="size-3 text-muted-foreground/30 opacity-0 group-hover:opacity-100 transition-opacity" />
             </div>
             <ul className="space-y-2 text-xs text-muted-foreground list-disc list-inside">
-              {(canvasData.uvp || []).map((item, idx) => (
+              {(canvasData.uniqueValueProposition || []).map((item, idx) => (
                 <li key={idx} className="leading-relaxed font-medium">{item}</li>
               ))}
             </ul>
@@ -313,7 +386,7 @@ export default function LeanCanvasView({
             <CardContent className="p-6 space-y-4">
               <div className="flex items-center justify-between border-b border-border pb-3">
                 <h3 className="font-sans font-bold text-lg text-foreground uppercase tracking-wider">
-                  Edit {editingBox.replace(/([A-Z])/g, ' $1')}
+                  Edit {BOX_TITLES[editingBox] || editingBox}
                 </h3>
                 <Button
                   variant="ghost"
@@ -330,28 +403,13 @@ export default function LeanCanvasView({
                   <div key={idx} className="flex items-center gap-2">
                     <Input
                       value={item}
-                      onChange={(e) => {
-                        const updatedList = [...canvasData[editingBox]];
-                        updatedList[idx] = e.target.value;
-                        setCanvasData((prev) => ({
-                          ...prev,
-                          [editingBox]: updatedList,
-                        }));
-                      }}
+                      onChange={(e) => updateBoxItem(editingBox, idx, e.target.value)}
                       className="bg-background border-border text-xs py-1.5"
                     />
                     <Button
                       variant="ghost"
                       size="icon"
-                      onClick={() => {
-                        const updatedList = canvasData[editingBox].filter(
-                          (_, i) => i !== idx
-                        );
-                        setCanvasData((prev) => ({
-                          ...prev,
-                          [editingBox]: updatedList,
-                        }));
-                      }}
+                      onClick={() => removeBoxItem(editingBox, idx)}
                       className="size-8 rounded text-muted-foreground hover:text-destructive hover:bg-destructive/10"
                     >
                       <X className="size-3.5" />
@@ -368,13 +426,7 @@ export default function LeanCanvasView({
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => {
-                    const currentList = canvasData[editingBox] || [];
-                    setCanvasData((prev) => ({
-                      ...prev,
-                      [editingBox]: [...currentList, "New canvas item"],
-                    }));
-                  }}
+                  onClick={() => addBoxItem(editingBox)}
                   className="text-xs border-border hover:bg-secondary rounded"
                 >
                   + Add Point
@@ -394,3 +446,4 @@ export default function LeanCanvasView({
     </div>
   );
 }
+
