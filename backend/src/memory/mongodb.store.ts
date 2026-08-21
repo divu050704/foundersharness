@@ -47,7 +47,6 @@ export class MongoDbStore implements OnModuleInit, OnModuleDestroy {
 
   async onModuleInit() {
     const mongoUri = process.env.MONGODB_URI;
-
     if (
       !mongoUri ||
       mongoUri.includes('<username>') ||

@@ -4,8 +4,7 @@ import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Sparkles, Loader2 } from "lucide-react";
-import { toast } from "sonner";
-import api from "@/lib/api";
+import { authClient } from "@/lib/auth-client";
 import { useTheme } from "next-themes";
 
 const shapes = [
@@ -44,7 +43,7 @@ const shapes = [
 export default function LoginPage() {
   const router = useRouter();
   const { theme } = useTheme();
-  
+
   // Login States
   const [isAuthenticating, setIsAuthenticating] = useState(false);
   const [googleScriptLoaded, setGoogleScriptLoaded] = useState(false);
@@ -65,58 +64,21 @@ export default function LoginPage() {
   const pausedRef = useRef(false);
   const timerRef = useRef(null);
 
-  // Load Google SDK and Flubber SDK dynamically
-  useEffect(() => {
-    // 1. Google Identity Services
-    if (googleClientId) {
-      const gScript = document.createElement("script");
-      gScript.src = "https://accounts.google.com/gsi/client";
-      gScript.async = true;
-      gScript.defer = true;
-      gScript.onload = () => setGoogleScriptLoaded(true);
-      document.body.appendChild(gScript);
-    }
-
-    // 2. Flubber interpolator
-    const fScript = document.createElement("script");
-    fScript.src = "https://cdn.jsdelivr.net/npm/flubber@0.4.2/build/flubber.min.js";
-    fScript.async = true;
-    fScript.onload = () => setFlubberLoaded(true);
-    document.body.appendChild(fScript);
-
-    return () => {
-      const scripts = document.querySelectorAll('script');
-      scripts.forEach(s => {
-        if (s.src.includes("gsi/client") || s.src.includes("flubber.min.js")) {
-          document.body.removeChild(s);
-        }
-      });
-    };
-  }, [googleClientId]);
-
-  // Render official Google button
-  useEffect(() => {
-    if (!googleScriptLoaded || !googleClientId) return;
+  const handleGoogleSignIn = async () => {
+    setIsAuthenticating(true);
 
     try {
-      window.google.accounts.id.initialize({
-        client_id: googleClientId,
-        callback: handleGoogleSignInCallback,
+      await authClient.signIn.social({
+        provider: "google",
+        callbackURL: `${process.env.NEXT_PUBLIC_APP_URL}/dashboard`,
       });
-
-      window.google.accounts.id.renderButton(
-        document.getElementById("google-signin-btn"),
-        {
-          theme: theme === "dark" ? "filled_black" : "outline",
-          size: "large",
-          width: 280,
-          shape: "rectangular",
-        }
-      );
-    } catch (err) {
-      console.error("Failed to initialize Google Sign-In button:", err);
+    } catch (error) {
+      console.error("Google authentication error:", error);
+      toast.error("Google Sign-In failed.");
+      setIsAuthenticating(false);
     }
-  }, [googleScriptLoaded, googleClientId, theme]);
+  };
+
 
   // Morph loop orchestration
   useEffect(() => {
@@ -181,7 +143,7 @@ export default function LoginPage() {
       const frame = (now) => {
         const t = Math.min((now - start) / duration, 1);
         const eased = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
-        
+
         if (blobRef.current) {
           blobRef.current.setAttribute("d", interpolator(eased));
         }
@@ -211,44 +173,17 @@ export default function LoginPage() {
     resetTimer(idx);
   };
 
-  const handleGoogleSignInCallback = async (response) => {
-    setIsAuthenticating(true);
-    try {
-      const verifyRes = await api.post("/auth/google", { token: response.credential });
-      if (verifyRes && verifyRes.success) {
-        const user = verifyRes.user;
-        localStorage.setItem("founder_user", JSON.stringify(user));
-        
-        if (verifyRes.onboarded) {
-          localStorage.setItem(`founder_onboarded_${user.email}`, "true");
-          localStorage.setItem("founder_onboarded", "true");
-          toast.success(`Welcome back, ${user.name}`);
-          router.push("/dashboard");
-        } else {
-          localStorage.setItem(`founder_onboarded_${user.email}`, "false");
-          localStorage.setItem("founder_onboarded", "false");
-          toast.success(`Account created: ${user.name}`);
-          router.push("/onboarding");
-        }
-      } else {
-        throw new Error("Verification failed");
-      }
-    } catch (err) {
-      console.error("Google authentication error:", err);
-      toast.error("Google Sign-In verification failed on backend.");
-      setIsAuthenticating(false);
-    }
-  };
+
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 min-h-screen w-full bg-background text-foreground transition-colors duration-500 font-sans overflow-hidden">
-      
+
       {/* LEFT PANEL: BESPOKE TACTILE FIELD NOTES NOTEBOOK PAGE */}
       <div className="lg:col-span-5 flex flex-col justify-between p-8 sm:p-12 md:p-16 bg-background border-r border-border relative overflow-hidden transition-colors duration-500 select-none">
-        
+
         {/* Notebook Vertical Margin Line */}
-        <div className="absolute top-0 bottom-0 left-10 md:left-14 w-[1px] bg-red-950/15 dark:bg-red-500/10 pointer-events-none" />
-        
+        <div className="absolute top-0 bottom-0 left-10 md:left-14 w-px bg-red-950/15 dark:bg-red-500/10 pointer-events-none" />
+
         {/* Notebook horizontal ruled line patterns */}
         <div className="absolute inset-0 bg-[linear-gradient(rgba(44,44,39,0.03)_1px,transparent_1px)] bg-[size:100%_24px] pointer-events-none" />
 
@@ -280,16 +215,22 @@ export default function LoginPage() {
           </div>
 
           <div className="space-y-6">
-            
+
             {/* Google OAuth Trigger */}
             <div className="w-full min-h-[50px] flex justify-center">
               {isAuthenticating ? (
                 <div className="flex items-center gap-2.5 font-mono text-[10px] text-[#8c897e] dark:text-[#EDEAE2]">
                   <Loader2 className="size-4 text-primary animate-spin" />
-                  <span>VERIFYING GOOGLE TOKEN...</span>
+                  <span>AUTHENTICATING WITH GOOGLE...</span>
                 </div>
               ) : (
-                <div id="google-signin-btn" className="w-full" />
+                <Button
+                  type="button"
+                  onClick={handleGoogleSignIn}
+                  className="w-full"
+                >
+                  Continue with Google
+                </Button>
               )}
             </div>
 
@@ -305,7 +246,7 @@ export default function LoginPage() {
       </div>
 
       {/* RIGHT PANEL: CAPABILITY MORPH SVG/CSS SHOWCASE (Always Dark matte slate matching specifications) */}
-      <div 
+      <div
         className="hidden lg:flex lg:col-span-7 flex-col items-center justify-between p-12 bg-[#121210] text-[#EDEAE2] relative overflow-hidden transition-all duration-1000"
       >
         {/* Dynamic cross-fading background radial glow overlays */}
@@ -335,27 +276,27 @@ export default function LoginPage() {
 
         {/* Morphing Blob Stage Area */}
         <div className="flex flex-col items-center gap-8 max-w-[420px] w-full z-10">
-          
+
           {/* Morphing Blob Wrapper */}
-          <div 
+          <div
             className="relative w-[260px] height-[260px] aspect-square cursor-pointer transition-transform duration-500 hover:scale-102"
             onMouseEnter={() => { pausedRef.current = true; if (timerRef.current) clearTimeout(timerRef.current); }}
             onMouseLeave={() => { pausedRef.current = false; resetTimer(current); }}
           >
             {/* Morphing SVG with dynamic drop shadow matching current shape's color */}
-            <svg 
-              viewBox="0 0 300 300" 
+            <svg
+              viewBox="0 0 300 300"
               className="w-full h-full overflow-visible transition-all duration-1000"
               style={{
                 filter: `drop-shadow(0 15px 35px ${shapes[current].color}33)`,
               }}
-              role="img" 
+              role="img"
               aria-hidden="true"
             >
-              <path 
-                ref={blobRef} 
-                d={shapes[0].path} 
-                fill={shapes[0].color} 
+              <path
+                ref={blobRef}
+                d={shapes[0].path}
+                fill={shapes[0].color}
                 style={{ transition: "fill .5s ease" }}
               />
             </svg>
@@ -363,47 +304,47 @@ export default function LoginPage() {
             {/* Icon 0: Ocaya (Autonomous Publishing) */}
             <div className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-16 h-16 pointer-events-none transition-all duration-[450ms] ${activeIconIndex === 0 ? "opacity-100 scale-100 rotate-0" : "opacity-0 scale-75 -rotate-6"}`}>
               <svg viewBox="0 0 64 64" fill="none" stroke="#121210" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-full h-full">
-                <path d="M14 26 L38 14 L38 50 L14 38 Z"/>
-                <path d="M14 26 L14 38 L20 38 L20 26 Z"/>
-                <path d="M38 20 C46 24 46 40 38 44"/>
+                <path d="M14 26 L38 14 L38 50 L14 38 Z" />
+                <path d="M14 26 L14 38 L20 38 L20 26 Z" />
+                <path d="M38 20 C46 24 46 40 38 44" />
               </svg>
             </div>
 
             {/* Icon 1: Reclaim (Scheduling) */}
             <div className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-16 h-16 pointer-events-none transition-all duration-[450ms] ${activeIconIndex === 1 ? "opacity-100 scale-100 rotate-0" : "opacity-0 scale-75 -rotate-6"}`}>
               <svg viewBox="0 0 64 64" fill="none" stroke="#121210" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-full h-full">
-                <rect x="12" y="16" width="40" height="36" rx="4"/>
-                <line x1="12" y1="26" x2="52" y2="26"/>
-                <line x1="22" y1="10" x2="22" y2="20"/>
-                <line x1="42" y1="10" x2="42" y2="20"/>
+                <rect x="12" y="16" width="40" height="36" rx="4" />
+                <line x1="12" y1="26" x2="52" y2="26" />
+                <line x1="22" y1="10" x2="22" y2="20" />
+                <line x1="42" y1="10" x2="42" y2="20" />
               </svg>
             </div>
 
             {/* Icon 2: Granter (Capital Discovery) */}
             <div className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-16 h-16 pointer-events-none transition-all duration-[450ms] ${activeIconIndex === 2 ? "opacity-100 scale-100 rotate-0" : "opacity-0 scale-75 -rotate-6"}`}>
               <svg viewBox="0 0 64 64" fill="none" stroke="#121210" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-full h-full">
-                <rect x="16" y="10" width="32" height="44" rx="3"/>
-                <path d="M24 24 L30 30 L40 18"/>
-                <line x1="22" y1="40" x2="42" y2="40"/>
-                <line x1="22" y1="46" x2="36" y2="46"/>
+                <rect x="16" y="10" width="32" height="44" rx="3" />
+                <path d="M24 24 L30 30 L40 18" />
+                <line x1="22" y1="40" x2="42" y2="40" />
+                <line x1="22" y1="46" x2="36" y2="46" />
               </svg>
             </div>
 
             {/* Icon 3: Strategy (Planner) */}
             <div className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-16 h-16 pointer-events-none transition-all duration-[450ms] ${activeIconIndex === 3 ? "opacity-100 scale-100 rotate-0" : "opacity-0 scale-75 -rotate-6"}`}>
               <svg viewBox="0 0 64 64" fill="none" stroke="#121210" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-full h-full">
-                <circle cx="32" cy="32" r="20"/>
-                <path d="M40 24 L28 28 L24 40 L36 36 Z" fill="#121210"/>
+                <circle cx="32" cy="32" r="20" />
+                <path d="M40 24 L28 28 L24 40 L36 36 Z" fill="#121210" />
               </svg>
             </div>
 
             {/* Icon 4: Meetups (Networking) */}
             <div className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-16 h-16 pointer-events-none transition-all duration-[450ms] ${activeIconIndex === 4 ? "opacity-100 scale-100 rotate-0" : "opacity-0 scale-75 -rotate-6"}`}>
               <svg viewBox="0 0 64 64" fill="none" stroke="#121210" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-full h-full">
-                <circle cx="24" cy="28" r="9"/>
-                <circle cx="42" cy="28" r="9"/>
-                <path d="M14 50 C14 40 20 36 26 36"/>
-                <path d="M50 50 C50 40 44 36 38 36"/>
+                <circle cx="24" cy="28" r="9" />
+                <circle cx="42" cy="28" r="9" />
+                <path d="M14 50 C14 40 20 36 26 36" />
+                <path d="M50 50 C50 40 44 36 38 36" />
               </svg>
             </div>
 
@@ -411,14 +352,12 @@ export default function LoginPage() {
 
           {/* Caption text with clean layout transitions */}
           <div className="text-center min-h-[82px] px-4">
-            <h3 className={`text-lg font-bold tracking-tight text-[#EDEAE2] mb-1.5 transition-all duration-500 ease-out ${
-              showCaption ? "opacity-100 translate-y-0" : "opacity-0 translate-y-2"
-            }`}>
+            <h3 className={`text-lg font-bold tracking-tight text-[#EDEAE2] mb-1.5 transition-all duration-500 ease-out ${showCaption ? "opacity-100 translate-y-0" : "opacity-0 translate-y-2"
+              }`}>
               {capName}
             </h3>
-            <p className={`text-xs text-[#8C897E] leading-relaxed max-w-sm mx-auto transition-all duration-500 ease-out ${
-              showCaption ? "opacity-100 translate-y-0" : "opacity-0 translate-y-1"
-            }`}>
+            <p className={`text-xs text-[#8C897E] leading-relaxed max-w-sm mx-auto transition-all duration-500 ease-out ${showCaption ? "opacity-100 translate-y-0" : "opacity-0 translate-y-1"
+              }`}>
               {capDesc}
             </p>
           </div>
@@ -431,9 +370,8 @@ export default function LoginPage() {
                 role="tab"
                 aria-label={s.name}
                 onClick={() => goTo(idx)}
-                className={`h-2.5 rounded-full border-none cursor-pointer p-0 transition-all duration-500 hover:bg-[#EDEAE2] ${
-                  current === idx ? "bg-[#EDEAE2] w-6" : "bg-[#2C2C27] w-2.5 hover:scale-110"
-                }`}
+                className={`h-2.5 rounded-full border-none cursor-pointer p-0 transition-all duration-500 hover:bg-[#EDEAE2] ${current === idx ? "bg-[#EDEAE2] w-6" : "bg-[#2C2C27] w-2.5 hover:scale-110"
+                  }`}
               />
             ))}
           </div>
