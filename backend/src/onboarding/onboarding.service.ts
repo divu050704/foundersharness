@@ -15,7 +15,6 @@ export class OnboardingService {
   async create(createOnboardingDto: CreateOnboardingDto) {
     let canvas: any = null;
     canvas = await this.agentsService.createCanvas(createOnboardingDto)
-    console.log(canvas)
     return {
       success: true,
       canvas,
