@@ -96,9 +96,6 @@ export class User {
   @Prop({ type: [EntitySchema], default: [] })
   entities!: Entity[];
 
-  @Prop({ type: [EntitySchema], default: [] })
-  entitities!: Entity[]; // alias for backwards compatibility
-
   @Prop({ type: [TimelineEventSchema], default: [] })
   timeline!: TimelineEvent[];
 

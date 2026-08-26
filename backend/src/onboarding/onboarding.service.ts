@@ -47,7 +47,7 @@ export class OnboardingService {
         { upsert: true }
       );
 
-      await this.neo4j.saveGraph(neo4jData);
+      await this.neo4j.saveGraph(email, neo4jData);
       this.logger.log(`Successfully stored memory extraction for email: ${email}`);
       return { success: true, message: "Features saved in memory" };
     } catch (e: any) {

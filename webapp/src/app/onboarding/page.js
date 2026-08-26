@@ -174,15 +174,7 @@ export default function Onboarding() {
       const isTextarea = e.target.tagName === "TEXTAREA";
 
       if (step >= 0 && step < QUESTIONS.length) {
-        if (e.altKey && e.key.toLowerCase() === "s") {
-          e.preventDefault();
-          handleSkip();
-        }
-
-        if (e.key === "Enter") {
-          if (isTextarea && !e.ctrlKey && !e.metaKey) {
-            return;
-          }
+        if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
           e.preventDefault();
           handleNext();
         }
@@ -414,14 +406,15 @@ export default function Onboarding() {
       const res = await api.post("/onboarding/extract", formattedPayload);
       console.log("Extraction response from backend:", res);
       setExtractSuccess(true);
-      toast.success("Startup blueprint saved successfully!");
+      toast.success("Startup blueprint saved successfully! Entering office floor...");
+      router.push("/dashboard");
     } catch (err) {
       console.error("Error posting to /onboarding/extract:", err);
       setExtractSuccess(true);
-      toast.success("Startup blueprint saved locally.");
+      toast.success("Entering office floor...");
+      router.push("/dashboard");
     } finally {
       setIsExtracting(false);
-      // DO NOT REDIRECT FOR NOW (as requested!)
     }
   };
 
@@ -812,21 +805,12 @@ export default function Onboarding() {
                       <ArrowLeft className="mr-1.5 size-3.5" />
                       Back
                     </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={handleSkip}
-                      className="text-xs text-muted-foreground hover:text-foreground hover:bg-secondary rounded"
-                    >
-                      Skip
-                      <SkipForward className="ml-1.5 size-3.5" />
-                    </Button>
                   </div>
 
                   <div className="flex items-center gap-3 w-full sm:w-auto justify-end">
                     <div className="hidden md:flex items-center gap-1 font-mono text-[9px] text-muted-foreground uppercase mr-2">
                       <kbd className="px-1 py-0.5 border border-border rounded bg-secondary">
-                        Enter
+                        Ctrl + Enter
                       </kbd>
                       <span>to continue</span>
                     </div>

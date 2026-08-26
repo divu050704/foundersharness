@@ -2,17 +2,14 @@ import { Injectable, Logger } from '@nestjs/common';
 import * as fs from 'fs';
 import * as path from 'path';
 
-
 export interface Properties {
   key: string;
   value: string;
 }
 
-
 export interface PropertyMap {
   [key: string]: string;
 }
-
 
 export interface GraphNode {
   id: string;
@@ -26,7 +23,6 @@ export interface GraphEdge {
   type: string;
   properties: PropertyMap;
 }
-
 
 export interface ExtractedGraph {
   nodes: {
@@ -43,6 +39,15 @@ export interface ExtractedGraph {
   }[];
 }
 
+export interface UserGraph {
+  nodes: GraphNode[];
+  edges: GraphEdge[];
+}
+
+interface Database {
+  users: Record<string, UserGraph>;
+}
+
 @Injectable()
 export class Neo4jStore {
   private readonly logger = new Logger(Neo4jStore.name);
@@ -57,41 +62,61 @@ export class Neo4jStore {
     this.ensureDbExists();
   }
 
-  
+  /**
+   * Ensure database directory and file exist.
+   */
   private ensureDbExists(): void {
     const dir = path.dirname(this.dbPath);
 
     if (!fs.existsSync(dir)) {
-      fs.mkdirSync(dir, { recursive: true });
+      fs.mkdirSync(dir, {
+        recursive: true,
+      });
     }
 
     if (!fs.existsSync(this.dbPath)) {
+      const initialDb: Database = {
+        users: {},
+      };
+
       fs.writeFileSync(
         this.dbPath,
-        JSON.stringify(
-          {
-            nodes: [],
-            edges: [],
-          },
-          null,
-          2,
-        ),
+        JSON.stringify(initialDb, null, 2),
         'utf8',
       );
     }
   }
 
-  
-  private readDb(): {
-    nodes: GraphNode[];
-    edges: GraphEdge[];
-  } {
+  /**
+   * Read the complete database.
+   */
+  private readDb(): Database {
     try {
       this.ensureDbExists();
 
-      const content = fs.readFileSync(this.dbPath, 'utf8');
+      const content = fs.readFileSync(
+        this.dbPath,
+        'utf8',
+      );
 
-      return JSON.parse(content);
+      const parsed = JSON.parse(content);
+
+      /**
+       * Basic protection against an invalid/old
+       * database structure.
+       */
+      if (
+        !parsed ||
+        typeof parsed !== 'object' ||
+        !parsed.users ||
+        typeof parsed.users !== 'object'
+      ) {
+        return {
+          users: {},
+        };
+      }
+
+      return parsed as Database;
     } catch (error) {
       this.logger.error(
         'Failed to read simulated Neo4j database',
@@ -99,17 +124,15 @@ export class Neo4jStore {
       );
 
       return {
-        nodes: [],
-        edges: [],
+        users: {},
       };
     }
   }
 
-  
-  private writeDb(data: {
-    nodes: GraphNode[];
-    edges: GraphEdge[];
-  }): void {
+  /**
+   * Write the complete database.
+   */
+  private writeDb(data: Database): void {
     try {
       this.ensureDbExists();
 
@@ -126,10 +149,47 @@ export class Neo4jStore {
     }
   }
 
+  /**
+   * Get a user's graph.
+   *
+   * Creates an empty graph if the user does not
+   * have one yet.
+   */
+  private getUserGraph(
+    db: Database,
+    userId: string,
+  ): UserGraph {
+    const normalizedUserId = userId.trim();
 
-  
+    if (!normalizedUserId) {
+      throw new Error('userId is required');
+    }
+
+    if (!db.users[normalizedUserId]) {
+      db.users[normalizedUserId] = {
+        nodes: [],
+        edges: [],
+      };
+    }
+
+    return db.users[normalizedUserId];
+  }
+
+  /**
+   * Convert:
+   *
+   * [
+   *   { key: 'name', value: 'Apple' }
+   * ]
+   *
+   * into:
+   *
+   * {
+   *   name: 'Apple'
+   * }
+   */
   private keyValueArrayToObject(
-    properties: Properties[],
+    properties: Properties[] = [],
   ): PropertyMap {
     return Object.fromEntries(
       properties.map(({ key, value }) => [
@@ -139,31 +199,102 @@ export class Neo4jStore {
     );
   }
 
-  async addNode(node: GraphNode): Promise<void> {
+  /**
+   * Find a node by ID.
+   */
+  private findNode(
+    graph: UserGraph,
+    nodeId: string,
+  ): GraphNode | undefined {
+    const normalizedId = nodeId.trim().toLowerCase();
+
+    return graph.nodes.find(
+      (node) =>
+        node.id.trim().toLowerCase() ===
+        normalizedId,
+    );
+  }
+
+  /**
+   * Find an edge.
+   */
+  private findEdge(
+    graph: UserGraph,
+    source: string,
+    target: string,
+    type: string,
+  ): GraphEdge | undefined {
+    const normalizedSource =
+      source.trim().toLowerCase();
+
+    const normalizedTarget =
+      target.trim().toLowerCase();
+
+    const normalizedType =
+      type.trim().toLowerCase();
+
+    return graph.edges.find(
+      (edge) =>
+        edge.source.trim().toLowerCase() ===
+          normalizedSource &&
+        edge.target.trim().toLowerCase() ===
+          normalizedTarget &&
+        edge.type.trim().toLowerCase() ===
+          normalizedType,
+    );
+  }
+
+  /**
+   * Add or update a node for a specific user.
+   */
+  async addNode(
+    userId: string,
+    node: GraphNode,
+  ): Promise<void> {
     const db = this.readDb();
 
-    const index = db.nodes.findIndex(
-      (n) =>
-        n.id.toLowerCase() === node.id.toLowerCase(),
+    const graph = this.getUserGraph(
+      db,
+      userId,
     );
 
-    if (index !== -1) {
-      db.nodes[index] = {
-        ...db.nodes[index],
-        label: node.label,
-        properties: {
-          ...db.nodes[index].properties,
-          ...node.properties,
-        },
+    const nodeId = node.id.trim();
+
+    if (!nodeId) {
+      return;
+    }
+
+    const existingNode = this.findNode(
+      graph,
+      nodeId,
+    );
+
+    if (existingNode) {
+      existingNode.label = node.label;
+
+      existingNode.properties = {
+        ...existingNode.properties,
+        ...node.properties,
       };
     } else {
-      db.nodes.push(node);
+      graph.nodes.push({
+        id: nodeId,
+        label: node.label,
+        properties: node.properties ?? {},
+      });
     }
 
     this.writeDb(db);
   }
 
+  /**
+   * Add a relationship for a specific user.
+   *
+   * If source or target nodes don't exist,
+   * they are automatically created as Concept nodes.
+   */
   async addRelationship(
+    userId: string,
     source: string,
     relation: string,
     target: string,
@@ -171,65 +302,80 @@ export class Neo4jStore {
   ): Promise<void> {
     const db = this.readDb();
 
+    const graph = this.getUserGraph(
+      db,
+      userId,
+    );
+
     const sourceId = source.trim();
     const targetId = target.trim();
+    const edgeType = relation.trim();
+
+    if (
+      !sourceId ||
+      !targetId ||
+      !edgeType
+    ) {
+      return;
+    }
 
     /**
      * Ensure source exists.
      */
-    if (
-      !db.nodes.some(
-        (n) =>
-          n.id.toLowerCase() === sourceId.toLowerCase(),
-      )
-    ) {
-      db.nodes.push({
+    if (!this.findNode(graph, sourceId)) {
+      graph.nodes.push({
         id: sourceId,
         label: 'Concept',
         properties: {},
       });
     }
 
-    
-    if (
-      !db.nodes.some(
-        (n) =>
-          n.id.toLowerCase() === targetId.toLowerCase(),
-      )
-    ) {
-      db.nodes.push({
+    /**
+     * Ensure target exists.
+     */
+    if (!this.findNode(graph, targetId)) {
+      graph.nodes.push({
         id: targetId,
         label: 'Concept',
         properties: {},
       });
     }
 
-    const edgeExists = db.edges.some(
-      (e) =>
-        e.source.toLowerCase() ===
-        sourceId.toLowerCase() &&
-        e.target.toLowerCase() ===
-        targetId.toLowerCase() &&
-        e.type.toLowerCase() ===
-        relation.toLowerCase(),
+    /**
+     * Check whether relationship already exists.
+     */
+    const existingEdge = this.findEdge(
+      graph,
+      sourceId,
+      targetId,
+      edgeType,
     );
 
-    
-    if (!edgeExists) {
-      db.edges.push({
+    if (existingEdge) {
+      existingEdge.properties = {
+        ...existingEdge.properties,
+        ...properties,
+      };
+    } else {
+      graph.edges.push({
         source: sourceId,
         target: targetId,
-        type: relation,
+        type: edgeType,
         properties,
       });
     }
 
-    
     this.writeDb(db);
   }
 
- 
-  async getRelated(entityName: string): Promise<
+  /**
+   * Get relationships connected to an entity
+   * for a specific user.
+   */
+  async getRelated(
+    userId: string,
+    entityName: string,
+  ): Promise<
     {
       type: 'outgoing' | 'incoming';
       relation: string;
@@ -240,7 +386,13 @@ export class Neo4jStore {
   > {
     const db = this.readDb();
 
-    const searchId = entityName.trim().toLowerCase();
+    const graph = this.getUserGraph(
+      db,
+      userId,
+    );
+
+    const searchId =
+      entityName.trim().toLowerCase();
 
     const results: {
       type: 'outgoing' | 'incoming';
@@ -250,10 +402,15 @@ export class Neo4jStore {
       properties: PropertyMap;
     }[] = [];
 
-    
-    db.edges.forEach((edge) => {
+    graph.edges.forEach((edge) => {
+      /**
+       * Outgoing:
+       *
+       * Apple -> founded_by -> Steve Jobs
+       */
       if (
-        edge.source.toLowerCase() === searchId
+        edge.source.trim().toLowerCase() ===
+        searchId
       ) {
         results.push({
           type: 'outgoing',
@@ -263,8 +420,14 @@ export class Neo4jStore {
         });
       }
 
+      /**
+       * Incoming:
+       *
+       * Steve Jobs <- founded_by <- Apple
+       */
       if (
-        edge.target.toLowerCase() === searchId
+        edge.target.trim().toLowerCase() ===
+        searchId
       ) {
         results.push({
           type: 'incoming',
@@ -278,29 +441,93 @@ export class Neo4jStore {
     return results;
   }
 
-  async getGraph(): Promise<{
-    nodes: GraphNode[];
-    edges: GraphEdge[];
-  }> {
-    return this.readDb();
+  /**
+   * Get the complete graph for a specific user.
+   */
+  async getGraph(
+    userId: string,
+  ): Promise<UserGraph> {
+    const db = this.readDb();
+
+    const normalizedUserId =
+      userId.trim();
+
+    if (!normalizedUserId) {
+      throw new Error('userId is required');
+    }
+
+    return (
+      db.users[normalizedUserId] ?? {
+        nodes: [],
+        edges: [],
+      }
+    );
   }
 
+  /**
+   * Clear only one user's graph.
+   */
+  async clear(
+    userId: string,
+  ): Promise<void> {
+    const db = this.readDb();
 
-  async clear(): Promise<void> {
-    this.writeDb({
+    const normalizedUserId =
+      userId.trim();
+
+    if (!normalizedUserId) {
+      throw new Error('userId is required');
+    }
+
+    db.users[normalizedUserId] = {
       nodes: [],
       edges: [],
-    });
+    };
+
+    this.writeDb(db);
   }
 
-  
-  
+  /**
+   * Delete a user's entire graph.
+   */
+  async deleteUserGraph(
+    userId: string,
+  ): Promise<void> {
+    const db = this.readDb();
+
+    const normalizedUserId =
+      userId.trim();
+
+    if (!normalizedUserId) {
+      throw new Error('userId is required');
+    }
+
+    delete db.users[normalizedUserId];
+
+    this.writeDb(db);
+  }
+
+  /**
+   * Save an extracted graph for a specific user.
+   *
+   * Existing nodes and relationships are merged.
+   */
   async saveGraph(
+    userId: string,
     graph: ExtractedGraph,
   ): Promise<void> {
     const db = this.readDb();
 
-    
+    const dbGraph = this.getUserGraph(
+      db,
+      userId,
+    );
+
+    /**
+     * ============================
+     * NODES
+     * ============================
+     */
     for (const node of graph.nodes) {
       const nodeId = node.id.trim();
 
@@ -313,27 +540,20 @@ export class Neo4jStore {
           node.properties,
         );
 
-      const index = db.nodes.findIndex(
-        (n) =>
-          n.id.toLowerCase() ===
-          nodeId.toLowerCase(),
+      const existingNode = this.findNode(
+        dbGraph,
+        nodeId,
       );
 
-      if (index !== -1) {
-        db.nodes[index] = {
-          ...db.nodes[index],
+      if (existingNode) {
+        existingNode.label = node.label;
 
-          label: node.label,
-
-          properties: {
-            ...db.nodes[index].properties,
-            ...properties,
-          },
+        existingNode.properties = {
+          ...existingNode.properties,
+          ...properties,
         };
-      }
-
-      else {
-        db.nodes.push({
+      } else {
+        dbGraph.nodes.push({
           id: nodeId,
           label: node.label,
           properties,
@@ -341,95 +561,92 @@ export class Neo4jStore {
       }
     }
 
+    /**
+     * ============================
+     * EDGES
+     * ============================
+     */
     for (const edge of graph.edges) {
-      const sourceId = edge.source.trim();
-      const targetId = edge.target.trim();
-      const edgeType = edge.type.trim();
+      const sourceId =
+        edge.source.trim();
 
-      if (!sourceId || !targetId || !edgeType) {
+      const targetId =
+        edge.target.trim();
+
+      const edgeType =
+        edge.type.trim();
+
+      if (
+        !sourceId ||
+        !targetId ||
+        !edgeType
+      ) {
         continue;
       }
 
-      
       const properties =
         this.keyValueArrayToObject(
           edge.properties,
         );
 
-      
-      const sourceExists = db.nodes.some(
-        (n) =>
-          n.id.toLowerCase() ===
-          sourceId.toLowerCase(),
-      );
-
-      if (!sourceExists) {
-        db.nodes.push({
+      /**
+       * Make sure source exists.
+       */
+      if (
+        !this.findNode(
+          dbGraph,
+          sourceId,
+        )
+      ) {
+        dbGraph.nodes.push({
           id: sourceId,
           label: 'Concept',
           properties: {},
         });
       }
 
-      
-      const targetExists = db.nodes.some(
-        (n) =>
-          n.id.toLowerCase() ===
-          targetId.toLowerCase(),
-      );
-
-      if (!targetExists) {
-        db.nodes.push({
+      /**
+       * Make sure target exists.
+       */
+      if (
+        !this.findNode(
+          dbGraph,
+          targetId,
+        )
+      ) {
+        dbGraph.nodes.push({
           id: targetId,
           label: 'Concept',
           properties: {},
         });
       }
 
-      
-      const edgeExists = db.edges.some(
-        (e) =>
-          e.source.toLowerCase() ===
-          sourceId.toLowerCase() &&
-          e.target.toLowerCase() ===
-          targetId.toLowerCase() &&
-          e.type.toLowerCase() ===
-          edgeType.toLowerCase(),
-      );
+      /**
+       * Find existing relationship.
+       */
+      const existingEdge =
+        this.findEdge(
+          dbGraph,
+          sourceId,
+          targetId,
+          edgeType,
+        );
 
-      
-      if (!edgeExists) {
-        db.edges.push({
+      if (existingEdge) {
+        existingEdge.properties = {
+          ...existingEdge.properties,
+          ...properties,
+        };
+      } else {
+        dbGraph.edges.push({
           source: sourceId,
           target: targetId,
           type: edgeType,
           properties,
         });
       }
-
-      
-      else {
-        const existingEdge =
-          db.edges.find(
-            (e) =>
-              e.source.toLowerCase() ===
-              sourceId.toLowerCase() &&
-              e.target.toLowerCase() ===
-              targetId.toLowerCase() &&
-              e.type.toLowerCase() ===
-              edgeType.toLowerCase(),
-          );
-
-        if (existingEdge) {
-          existingEdge.properties = {
-            ...existingEdge.properties,
-            ...properties,
-          };
-        }
-      }
     }
 
-    
     this.writeDb(db);
   }
 }
