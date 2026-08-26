@@ -1,3 +1,4 @@
+@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&family=Silkscreen&display=swap');
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
@@ -9,6 +10,9 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-sans);
   --font-mono: var(--font-geist-mono);
+  --font-pixel: 'Press Start 2P', cursive;
+  --font-vt323: 'VT323', monospace;
+  --font-silkscreen: 'Silkscreen', monospace;
   --font-heading: var(--font-sans);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
@@ -49,99 +53,97 @@
 }
 
 :root {
-  /* Light Mode - Field Notes Inverted */
-  --background: #faf9f6;
-  --foreground: #141310;
-  --card: #faf9f6;
-  --card-foreground: #141310;
-  --popover: #faf9f6;
-  --popover-foreground: #141310;
+  /* Light Mode - Dunder Mifflin Paper & Office */
+  --background: #f4f1ea;
+  --foreground: #1c1917;
+  --card: #ede8df;
+  --card-foreground: #1c1917;
+  --popover: #ede8df;
+  --popover-foreground: #1c1917;
 
-  /* Confident deep accent - moss green */
-  --primary: #3b5640;
-  --primary-foreground: #faf9f6;
+  /* Office Wood & Gold Accents */
+  --primary: #854d0e;
+  --primary-foreground: #fef08a;
 
-  --secondary: #e2e0d8;
-  --secondary-foreground: #141310;
+  --secondary: #e7e2d7;
+  --secondary-foreground: #1c1917;
 
-  --muted: #e2e0d8;
-  --muted-foreground: #7a7870;
+  --muted: #e7e2d7;
+  --muted-foreground: #78716c;
 
-  --accent: #e2e0d8;
-  --accent-foreground: #3b5640;
+  --accent: #d6cebe;
+  --accent-foreground: #713f12;
 
-  --destructive: #8b1a1a;
-  --destructive-foreground: #faf9f6;
+  --destructive: #991b1b;
+  --destructive-foreground: #fef2f2;
 
-  --border: #e2e0d8;
-  --input: #e2e0d8;
-  --ring: #3b5640;
+  --border: #d6cebe;
+  --input: #d6cebe;
+  --ring: #854d0e;
 
-  --chart-1: #3b5640;
-  --chart-2: #7a7870;
-  --chart-3: #141310;
-  --chart-4: #e2e0d8;
+  --chart-1: #854d0e;
+  --chart-2: #78716c;
+  --chart-3: #1c1917;
+  --chart-4: #e7e2d7;
   --chart-5: #ffffff;
 
-  /* Sharp square-ish corners max 4px */
-  --radius: 4px;
+  --radius: 2px;
 
-  --sidebar: #faf9f6;
-  --sidebar-foreground: #141310;
-  --sidebar-primary: #3b5640;
-  --sidebar-primary-foreground: #faf9f6;
-  --sidebar-accent: #e2e0d8;
-  --sidebar-accent-foreground: #141310;
-  --sidebar-border: #e2e0d8;
-  --sidebar-ring: #3b5640;
+  --sidebar: #e9e4d9;
+  --sidebar-foreground: #1c1917;
+  --sidebar-primary: #854d0e;
+  --sidebar-primary-foreground: #fef08a;
+  --sidebar-accent: #d6cebe;
+  --sidebar-accent-foreground: #1c1917;
+  --sidebar-border: #d6cebe;
+  --sidebar-ring: #854d0e;
 }
 
 .dark {
-  /* Dark Mode - Field Notes Original */
-  --background: #121210;
-  --foreground: #edeae2;
-  --card: #1b1b18;
-  --card-foreground: #edeae2;
-  --popover: #1b1b18;
-  --popover-foreground: #edeae2;
+  /* Dark Mode - Retro Munder-Difflin Terminal */
+  --background: #0f1419;
+  --foreground: #f3f4f6;
+  --card: #19222d;
+  --card-foreground: #f3f4f6;
+  --popover: #19222d;
+  --popover-foreground: #f3f4f6;
 
-  /* Confident accent - desaturated moss green */
-  --primary: #4a6b4e;
-  --primary-foreground: #121210;
+  /* Retro Amber & Cyan Accents */
+  --primary: #f59e0b;
+  --primary-foreground: #111827;
 
-  --secondary: #2c2c27;
-  --secondary-foreground: #edeae2;
+  --secondary: #24303e;
+  --secondary-foreground: #f3f4f6;
 
-  --muted: #2c2c27;
-  --muted-foreground: #8c897e;
+  --muted: #24303e;
+  --muted-foreground: #9ca3af;
 
-  --accent: #2c2c27;
-  --accent-foreground: #4a6b4e;
+  --accent: #2c3b4e;
+  --accent-foreground: #fbbf24;
 
-  --destructive: #a33a3a;
-  --destructive-foreground: #edeae2;
+  --destructive: #ef4444;
+  --destructive-foreground: #fef2f2;
 
-  --border: #2c2c27;
-  --input: #2c2c27;
-  --ring: #4a6b4e;
+  --border: #2e3e50;
+  --input: #2e3e50;
+  --ring: #f59e0b;
 
-  --chart-1: #4a6b4e;
-  --chart-2: #8c897e;
-  --chart-3: #edeae2;
-  --chart-4: #2c2c27;
-  --chart-5: #121210;
+  --chart-1: #f59e0b;
+  --chart-2: #10b981;
+  --chart-3: #06b6d4;
+  --chart-4: #a855f7;
+  --chart-5: #ec4899;
 
-  /* Sharp square-ish corners max 4px */
-  --radius: 4px;
+  --radius: 2px;
 
-  --sidebar: #1b1b18;
-  --sidebar-foreground: #edeae2;
-  --sidebar-primary: #4a6b4e;
-  --sidebar-primary-foreground: #121210;
-  --sidebar-accent: #2c2c27;
-  --sidebar-accent-foreground: #edeae2;
-  --sidebar-border: #2c2c27;
-  --sidebar-ring: #4a6b4e;
+  --sidebar: #131a22;
+  --sidebar-foreground: #f3f4f6;
+  --sidebar-primary: #f59e0b;
+  --sidebar-primary-foreground: #111827;
+  --sidebar-accent: #24303e;
+  --sidebar-accent-foreground: #f3f4f6;
+  --sidebar-border: #2e3e50;
+  --sidebar-ring: #f59e0b;
 }
 
 @layer base {
@@ -155,3 +157,69 @@
     @apply font-sans;
   }
 }
+
+/* Custom Munder Difflin Pixel Art Styles */
+.font-pixel {
+  font-family: 'Press Start 2P', cursive, monospace;
+}
+.font-vt323 {
+  font-family: 'VT323', monospace;
+}
+.font-silkscreen {
+  font-family: 'Silkscreen', monospace;
+}
+
+.pixel-border {
+  box-shadow: 
+    -2px 0 0 0 currentColor,
+    2px 0 0 0 currentColor,
+    0 -2px 0 0 currentColor,
+    0 2px 0 0 currentColor;
+}
+
+.pixel-border-sm {
+  box-shadow: 
+    -1px 0 0 0 currentColor,
+    1px 0 0 0 currentColor,
+    0 -1px 0 0 currentColor,
+    0 1px 0 0 currentColor;
+}
+
+.pixel-box {
+  border: 2px solid currentColor;
+  box-shadow: 3px 3px 0px 0px rgba(0, 0, 0, 0.4);
+}
+
+.pixel-button {
+  border: 2px solid currentColor;
+  box-shadow: 3px 3px 0px 0px currentColor;
+  transition: all 0.05s ease-in-out;
+}
+.pixel-button:active {
+  transform: translate(2px, 2px);
+  box-shadow: 1px 1px 0px 0px currentColor;
+}
+
+/* CRT Scanline effect (Disabled) */
+.crt-overlay::before {
+  display: none;
+}
+
+@keyframes pulse-subtle {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.85; transform: scale(1.02); }
+}
+
+.animate-pulse-subtle {
+  animation: pulse-subtle 3s infinite ease-in-out;
+}
+
+@keyframes float-speech {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
+}
+
+.animate-float-speech {
+  animation: float-speech 2.5s infinite ease-in-out;
+}
+

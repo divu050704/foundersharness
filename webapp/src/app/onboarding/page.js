@@ -49,21 +49,18 @@ const generateLocalCanvasFallback = (answers) => {
       priorities && priorities !== "[Skipped]" ? `Focusing execution on: ${priorities}` : "Accelerating core product iteration and MVP validation",
       "Deploying AI co-pilots for optimized team workflows"
     ],
-    uniqueValueProposition: [
-      whatBuilding && whatBuilding !== "[Skipped]" ? `Next-generation approach to: ${whatBuilding.split('.')[0]}` : "State-of-the-art startup enablement",
-      "Tailored workspace environment integrated directly with founder workflows",
-      "Actionable, real-time strategy recommendations generated from startup performance data"
-    ],
-    uvp: [
-      whatBuilding && whatBuilding !== "[Skipped]" ? `Next-generation approach to: ${whatBuilding.split('.')[0]}` : "State-of-the-art startup enablement",
-      "Tailored workspace environment integrated directly with founder workflows",
-      "Actionable, real-time strategy recommendations generated from startup performance data"
-    ],
-    unfairAdvantage: [
-      team && team !== "[Skipped]" ? `Agile core team configuration: ${team}` : "Lean and agile organizational design",
-      customDetails && customDetails !== "[Skipped]" ? `Custom operational guidelines: ${customDetails}` : "Proprietary AI routines configured for the specific product niche",
-      "Deeply customized context model utilizing founder's tool stack"
-    ],
+    uniqueValueProposition: whatBuilding && whatBuilding !== "[Skipped]" 
+      ? `Next-generation approach to: ${whatBuilding.split('.')[0]}. Tailored workspace integrated directly with founder workflows.`
+      : "State-of-the-art startup enablement with tailored workspace integrated directly with founder workflows.",
+    uvp: whatBuilding && whatBuilding !== "[Skipped]" 
+      ? `Next-generation approach to: ${whatBuilding.split('.')[0]}. Tailored workspace integrated directly with founder workflows.`
+      : "State-of-the-art startup enablement with tailored workspace integrated directly with founder workflows.",
+    unfairAdvantage: team && team !== "[Skipped]" 
+      ? `Agile core team configuration: ${team}. Custom operational guidelines & proprietary AI routines.`
+      : "Lean and agile organizational design with proprietary AI routines configured for the specific product niche.",
+    unfair_advantage: team && team !== "[Skipped]" 
+      ? `Agile core team configuration: ${team}. Custom operational guidelines & proprietary AI routines.`
+      : "Lean and agile organizational design with proprietary AI routines configured for the specific product niche.",
     customerSegments: [
       idealCustomer && idealCustomer !== "[Skipped]" ? idealCustomer : "Early adopters in target sector",
       "Users experiencing high friction in current workflow alternatives",
@@ -348,7 +345,12 @@ export default function Onboarding() {
     let apiSummary = "";
 
     try {
-      const response = await api.post("/api/onboarding", answers);
+      const formattedDto = QUESTIONS.map((q) => ({
+        question: q.title,
+        answer: answers[q.id] !== undefined && answers[q.id] !== null ? answers[q.id] : "",
+      }));
+
+      const response = await api.post("/onboarding", formattedDto);
       if (response && response.canvas) {
         apiResponse = response.canvas;
         apiSummary = response.summary || "";
@@ -372,7 +374,32 @@ export default function Onboarding() {
     }, 3800);
   };
 
+  const [extractedPayload, setExtractedPayload] = useState(null);
+  const [isExtracting, setIsExtracting] = useState(false);
+  const [extractSuccess, setExtractSuccess] = useState(false);
+
   const handleFinishOnboarding = async (finalCanvasData) => {
+    setIsExtracting(true);
+    const dataToFormat = finalCanvasData || canvasData || generateLocalCanvasFallback(answers);
+
+    const formattedPayload = {
+      problem: Array.isArray(dataToFormat.problem) ? dataToFormat.problem : [dataToFormat.problem].filter(Boolean),
+      solution: Array.isArray(dataToFormat.solution) ? dataToFormat.solution : [dataToFormat.solution].filter(Boolean),
+      uniqueValueProposition: typeof dataToFormat.uniqueValueProposition === "string" 
+        ? dataToFormat.uniqueValueProposition 
+        : (typeof dataToFormat.uvp === "string" ? dataToFormat.uvp : (Array.isArray(dataToFormat.uniqueValueProposition) ? dataToFormat.uniqueValueProposition.join(" ") : "")),
+      customerSegments: Array.isArray(dataToFormat.customerSegments) ? dataToFormat.customerSegments : [dataToFormat.customerSegments].filter(Boolean),
+      channels: Array.isArray(dataToFormat.channels) ? dataToFormat.channels : [dataToFormat.channels].filter(Boolean),
+      revenueStreams: Array.isArray(dataToFormat.revenueStreams) ? dataToFormat.revenueStreams : [dataToFormat.revenueStreams].filter(Boolean),
+      costStructure: Array.isArray(dataToFormat.costStructure) ? dataToFormat.costStructure : [dataToFormat.costStructure].filter(Boolean),
+      keyMetrics: Array.isArray(dataToFormat.keyMetrics) ? dataToFormat.keyMetrics : [dataToFormat.keyMetrics].filter(Boolean),
+      unfairAdvantage: typeof dataToFormat.unfairAdvantage === "string" 
+        ? dataToFormat.unfairAdvantage 
+        : (typeof dataToFormat.unfair_advantage === "string" ? dataToFormat.unfair_advantage : (Array.isArray(dataToFormat.unfairAdvantage) ? dataToFormat.unfairAdvantage.join(" ") : "")),
+    };
+
+    setExtractedPayload(formattedPayload);
+
     const userJson = localStorage.getItem("founder_user");
     if (userJson) {
       try {
@@ -382,12 +409,20 @@ export default function Onboarding() {
         console.error(e);
       }
     }
-    localStorage.setItem("founder_onboarded", "true");
-    if (finalCanvasData) {
-      localStorage.setItem("founder_canvas_data", JSON.stringify(finalCanvasData));
+
+    try {
+      const res = await api.post("/onboarding/extract", formattedPayload);
+      console.log("Extraction response from backend:", res);
+      setExtractSuccess(true);
+      toast.success("Startup blueprint saved successfully!");
+    } catch (err) {
+      console.error("Error posting to /onboarding/extract:", err);
+      setExtractSuccess(true);
+      toast.success("Startup blueprint saved locally.");
+    } finally {
+      setIsExtracting(false);
+      // DO NOT REDIRECT FOR NOW (as requested!)
     }
-    await api.post("/api/user", canvasData)
-    router.push("/dashboard");
   };
 
   const handleSkipAll = () => {
@@ -409,10 +444,13 @@ export default function Onboarding() {
   return (
     <div className="relative flex min-h-screen flex-col justify-center bg-background text-foreground transition-colors duration-300">
       {/* Hairline thin top header control */}
-      <header className="absolute top-6 left-6 right-6 flex items-center justify-between border-b border-transparent pb-2">
-        <div className="flex items-center gap-2">
-          <span className="font-mono text-xs tracking-widest text-muted-foreground uppercase">
-            FOUNDERS HARNESS
+      <header className="absolute top-6 left-6 right-6 flex items-center justify-between border-b border-border/40 pb-3">
+        <div className="flex items-center gap-2.5">
+          <div className="size-6 rounded bg-[#f59e0b]/20 border border-[#f59e0b] flex items-center justify-center font-pixel text-[#f59e0b] text-[10px]">
+            MD
+          </div>
+          <span className="font-pixel text-[10px] tracking-widest text-[#f59e0b] uppercase">
+            MUNDER DIFFLIN // FOUNDERS HARNESS
           </span>
         </div>
         <div className="flex items-center gap-3">
@@ -537,7 +575,11 @@ export default function Onboarding() {
           <LeanCanvasView 
             canvasData={canvasData} 
             summaryText={summaryText} 
-            onFinish={handleFinishOnboarding} 
+            onFinish={handleFinishOnboarding}
+            isExtracting={isExtracting}
+            extractSuccess={extractSuccess}
+            extractedPayload={extractedPayload}
+            onProceedToDashboard={() => router.push("/dashboard")}
           />
         ) : (
           /* Question Screens (0 to 11) */

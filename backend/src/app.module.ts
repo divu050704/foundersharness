@@ -8,8 +8,6 @@ import { AgentsModule } from './agents/agents.module';
 import { AuthModule } from '@thallesp/nestjs-better-auth';
 import { auth } from './auth'; // your betterAuth(...) instance
 
-import { SocialMediaModule } from './social/social.module';
-import { MemoryModule } from './memory/memory.module';
 import { MongooseModule } from '@nestjs/mongoose';
 import { UserModule } from './user/user.module';
 
@@ -28,8 +26,6 @@ import { UserModule } from './user/user.module';
     OnboardingModule,
     AgentsModule,
     AuthModule.forRoot(auth), // ← pass your auth instance here
-    SocialMediaModule,
-    MemoryModule,
     UserModule,
   ],
   controllers: [AppController],

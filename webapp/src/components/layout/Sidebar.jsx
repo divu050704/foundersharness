@@ -2,21 +2,24 @@
 
 import {
   BarChart3,
-  LayoutDashboard,
+  Building2,
   Settings,
   Shield,
   ShoppingCart,
   Users,
   Share2,
   Brain,
+  Award,
+  Sparkles
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
+import { playRetroSound } from "@/lib/retroAudio";
 
 const navigation = [
-  { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+  { name: "Office Floor 🏢", href: "/dashboard", icon: Building2 },
   { name: "Business Memory", href: "/dashboard/memory", icon: Brain },
   { name: "Social Media", href: "/dashboard/social", icon: Share2 },
   { name: "Users", href: "/dashboard/users", icon: Users },
@@ -44,46 +47,75 @@ export default function Sidebar() {
   }, []);
 
   return (
-    <div className="flex h-full w-64 flex-col border-r border-border bg-card text-card-foreground">
-      <div className="flex h-16 items-center px-6 border-b border-border">
+    <div className="flex h-full w-64 flex-col border-r border-border bg-card text-card-foreground font-mono">
+      {/* Brand Header with Dunder Mifflin / Munder Difflin Style */}
+      <div className="flex flex-col justify-center px-6 py-4 border-b border-border bg-card">
         <Link
           href="/dashboard"
+          onClick={() => playRetroSound("click")}
           className="flex items-center gap-2 font-semibold"
         >
-          <Shield className="size-5 text-primary" />
-          <span className="text-base font-bold tracking-tight text-foreground uppercase">
-            Founders Harness
-          </span>
+          <div className="size-7 rounded bg-amber-500/20 border border-amber-500 flex items-center justify-center font-pixel text-amber-500 text-xs shadow">
+            MD
+          </div>
+          <div className="flex flex-col">
+            <span className="text-xs font-pixel tracking-wider text-foreground uppercase">
+              Munder Difflin
+            </span>
+            <span className="text-[9px] font-mono text-amber-500/90 font-bold uppercase tracking-widest">
+              Paper Co. & Multi-Agent HQ
+            </span>
+          </div>
         </Link>
       </div>
-      <nav className="flex-1 space-y-1 px-4 py-6">
+
+      {/* Navigation Links */}
+      <nav className="flex-1 space-y-1.5 px-3 py-5">
         {navigation.map((item) => {
           const isActive = pathname === item.href;
           return (
             <Link
               key={item.name}
               href={item.href}
+              onClick={() => playRetroSound("click")}
               className={cn(
-                "group flex items-center gap-3 rounded px-3 py-2 text-sm font-medium transition-none",
+                "group flex items-center gap-3 rounded-md px-3 py-2 text-xs font-mono font-medium transition-all",
                 isActive
-                  ? "bg-primary text-primary-foreground font-semibold"
-                  : "text-muted-foreground hover:bg-secondary hover:text-foreground",
+                  ? "bg-primary text-primary-foreground font-bold shadow-sm border border-primary/50"
+                  : "text-muted-foreground hover:bg-secondary hover:text-foreground border border-transparent",
               )}
             >
               <item.icon className="size-4 flex-shrink-0" />
-              {item.name}
+              <span>{item.name}</span>
             </Link>
           );
         })}
       </nav>
+
+      {/* Office Floor Stats Badge */}
+      <div className="px-4 py-3 border-t border-border bg-secondary/30">
+        <div className="bg-amber-500/10 border border-amber-500/30 p-2.5 rounded text-[11px] font-mono space-y-1">
+          <div className="flex items-center justify-between text-amber-500 font-bold">
+            <span className="flex items-center gap-1 font-pixel text-[9px]">
+              <Sparkles className="size-3" /> HQ STATUS
+            </span>
+            <span>ONLINE</span>
+          </div>
+          <p className="text-[10px] text-muted-foreground leading-tight">
+            8 CLI Agents Active on Floor 1. Michael Scott presiding.
+          </p>
+        </div>
+      </div>
+
+      {/* Admin User Footer */}
       <div className="p-4 border-t border-border">
-        <div className="flex items-center gap-3 rounded bg-secondary p-3">
-          <div className="size-8 rounded bg-background flex items-center justify-center font-bold text-foreground text-xs uppercase">
+        <div className="flex items-center gap-3 rounded bg-secondary p-2.5">
+          <div className="size-8 rounded bg-background flex items-center justify-center font-bold text-foreground text-xs uppercase border border-border">
             {user.avatar}
           </div>
-          <div>
-            <p className="text-xs font-semibold text-foreground truncate max-w-[140px]">{user.name}</p>
-            <p className="text-[10px] text-muted-foreground truncate max-w-[140px]">
+          <div className="overflow-hidden">
+            <p className="text-xs font-bold text-foreground truncate max-w-[130px]">{user.name}</p>
+            <p className="text-[10px] text-muted-foreground truncate max-w-[130px]">
               {user.email}
             </p>
           </div>
@@ -92,3 +124,4 @@ export default function Sidebar() {
     </div>
   );
 }
+

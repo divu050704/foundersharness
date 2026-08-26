@@ -26,6 +26,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { api } from "@/lib/api";
+import { isAudioEnabled, toggleAudio } from "@/lib/retroAudio";
 
 export default function Navbar() {
   const { theme, setTheme } = useTheme();
@@ -243,19 +244,37 @@ export default function Navbar() {
         )}
 
         {mounted && (
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-            className="size-8 rounded hover:bg-secondary text-muted-foreground hover:text-foreground"
-            aria-label="Toggle theme"
-          >
-            {theme === "dark" ? (
-              <Sun className="size-4" />
-            ) : (
-              <Moon className="size-4" />
-            )}
-          </Button>
+          <div className="flex items-center gap-1.5">
+            {/* Retro Sound FX Toggle */}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                const current = isAudioEnabled();
+                toggleAudio(!current);
+                toast.info(`Retro Sound FX: ${!current ? "ENABLED 🔊" : "DISABLED 🔇"}`);
+              }}
+              className="h-8 px-2 text-xs text-muted-foreground hover:text-foreground font-mono"
+              title="Toggle Retro Sound Effects"
+            >
+              {isAudioEnabled() ? "🔊 SFX ON" : "🔇 SFX OFF"}
+            </Button>
+
+            {/* Theme Toggle */}
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+              className="size-8 rounded hover:bg-secondary text-muted-foreground hover:text-foreground"
+              aria-label="Toggle theme"
+            >
+              {theme === "dark" ? (
+                <Sun className="size-4 text-amber-400" />
+              ) : (
+                <Moon className="size-4 text-primary" />
+              )}
+            </Button>
+          </div>
         )}
         <Button
           variant="ghost"

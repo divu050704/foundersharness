@@ -16,11 +16,5 @@ export class UserService {
         const exists=  await this.userModel.exists({ email: email });
         return exists!==null ? true : false;
     }
-    async saveCanvas(email: string, canvasDTO: UpdateCanvasDTO): Promise<void>{
-        await this.userModel.updateOne({email: email}, {$set: {email, canvasDTO}}, {upsert: true})
-        // return true
-    }
-    async saveMemoery(email: string, canvas: LeanCanvasOutput): Promise<void>{
-        console.log(this.agentsService.createMemory(canvas))
-    }
+    
 }

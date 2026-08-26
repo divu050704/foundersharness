@@ -148,45 +148,7 @@ export const EntityExtractor: Agent = {
   systemPrompt: `You are a high-fidelity Memory Extraction Pipeline for a Founder's OS. 
 Analyze the input text (onboarding details, transcripts, notes, etc.) and extract structured facts, entities, relationships, and chronological events.
 
-Your response MUST be a single, valid JSON object containing exactly these fields:
-{
-  "mongo": {
-    "company": {
-      "name": "string (inferred name of company or 'My Company' if unknown)",
-      "product": "string (summary of what is being built)",
-      "stage": "string (e.g., Idea, MVP, Pre-revenue, Growth)",
-      "teamSize": number (total team members, inferred or default 1),
-      "goals": ["string"],
-      "bottlenecks": ["string"],
-      "tools": ["string"]
-    },
-    "entities": [
-      {
-        "type": "string (e.g., Customer, Competitor, Feature, Partner, Founder, Advisor, Investor)",
-        "name": "string (name of entity)",
-        "data": { "key": "value" },
-        "confidence": number (0.0 to 1.0 confidence score of extraction),
-        "source": "string (source context or document title)"
-      }
-    ]
-  },
-  "neo4j": {
-    "nodes": [
-      { "id": "string (unique identifier, e.g., name or title)", "label": "string (e.g., Person, Tool, Feature, Customer, Company)", "properties": { "key": "value" } }
-    ],
-    "edges": [
-      { "source": "string (node id)", "target": "string (node id)", "type": "string (VERB_IN_CAPS, e.g., CREATED, USES, TARGETS, DELAYED, RECRUITED)", "properties": { "key": "value" } }
-    ]
-  },
-  "timeline": [
-    {
-      "date": "string (format YYYY-MM or YYYY-MM-DD or approximate)",
-      "title": "string (short event description)",
-      "description": "string (detailed event description)",
-      "confidence": number (0.0 to 1.0)
-    }
-  ]
-}
+
 
 Rules:
 - Be highly precise. Do not invent connections that aren't mentioned or clearly implied in the text.
