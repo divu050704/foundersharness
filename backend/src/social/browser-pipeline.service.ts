@@ -1,26 +1,26 @@
-import { Injectable, Logger } from '@nestjs/common';
+// import { Injectable, Logger } from '@nestjs/common';
 import { DeviceHookService } from './device-hook.service';
-import { GeminiService, PipelineStage, AgentFinishVerdict, FieldRequirement } from '../onboarding/gemini.service';
+// import { GeminiService, PipelineStage, AgentFinishVerdict, FieldRequirement } from '../onboarding/gemini.service';
 
-export interface RunBrowserPipelineOptions {
-  label: string;
-  systemPrompt: string;
-  stages: PipelineStage[];
-  startUrl?: string;
-  maxAttempts?: number;
-  handleFinish?: (action: any, attempt: number, maxAttempts: number) => Promise<AgentFinishVerdict>;
-  navigateTimeoutMs?: number;
-  clickTimeoutMs?: number;
-  finishRequirements?: FieldRequirement[];
-}
+// export interface RunBrowserPipelineOptions {
+//   label: string;
+//   systemPrompt: string;
+//   stages: PipelineStage[];
+//   startUrl?: string;
+//   maxAttempts?: number;
+//   handleFinish?: (action: any, attempt: number, maxAttempts: number) => Promise<AgentFinishVerdict>;
+//   navigateTimeoutMs?: number;
+//   clickTimeoutMs?: number;
+//   finishRequirements?: FieldRequirement[];
+// }
 
-@Injectable()
+// @Injectable()
 export class BrowserPipelineService {
-  private readonly logger = new Logger(BrowserPipelineService.name);
+  // private readonly logger = new Logger(BrowserPipelineService.name);
 
   constructor(
     private readonly deviceHookService: DeviceHookService,
-    private readonly geminiService: GeminiService,
+    // private readonly geminiService: GeminiService,
   ) {}
 
   private sleep(ms: number) {
@@ -35,7 +35,7 @@ export class BrowserPipelineService {
       const rawElements = await this.deviceHookService.sendCommand('content');
       return { url: url || '', elements: rawElements };
     } catch (err) {
-      this.logger.error('Failed to get browser state:', err.message);
+      // this.logger.error('Failed to get browser state:', err.message);
       return { url: '', elements: '' };
     }
   }
@@ -59,7 +59,7 @@ export class BrowserPipelineService {
             targetUrl = urlObj.origin + targetUrl;
           }
         } catch (err) {
-          this.logger.warn(`Failed to resolve relative URL: ${err.message}`);
+          // this.logger.warn(`Failed to resolve relative URL: ${err.message}`);
         }
       }
       await this.deviceHookService.sendCommand('navigate', { url: targetUrl }, navigateTimeoutMs);
@@ -89,30 +89,30 @@ export class BrowserPipelineService {
     throw new Error(`Unknown action type "${action.action}".`);
   }
 
-  async run(opts: RunBrowserPipelineOptions): Promise<any> {
-    if (!this.deviceHookService.isHookConnected()) {
-      throw new Error('device-hook desktop helper is not connected. Please open it.');
-    }
+  // async run(opts: RunBrowserPipelineOptions): Promise<any> {
+  //   if (!this.deviceHookService.isHookConnected()) {
+  //     throw new Error('device-hook desktop helper is not connected. Please open it.');
+  //   }
 
-    if (opts.startUrl) {
-      await this.deviceHookService.sendCommand('navigate', { url: opts.startUrl });
-      await this.sleep(3000);
-    }
+  //   if (opts.startUrl) {
+  //     await this.deviceHookService.sendCommand('navigate', { url: opts.startUrl });
+  //     await this.sleep(3000);
+  //   }
 
-    return this.geminiService.runAgentLoop({
-      label: opts.label,
-      systemPrompt: opts.systemPrompt,
-      pipelineStages: opts.stages,
-      maxAttempts: opts.maxAttempts ?? 15,
-      getState: () => this.getBrowserState(),
-      buildUserPrompt: () => '',
-      executeAction: (action) =>
-        this.executeBrowserAction(action, {
-          navigateTimeoutMs: opts.navigateTimeoutMs ?? 15000,
-          clickTimeoutMs: opts.clickTimeoutMs ?? 35000,
-        }),
-      handleFinish: opts.handleFinish,
-      finishRequirements: opts.finishRequirements,
-    });
-  }
+  //   return this.geminiService.runAgentLoop({
+  //     label: opts.label,
+  //     systemPrompt: opts.systemPrompt,
+  //     pipelineStages: opts.stages,
+  //     maxAttempts: opts.maxAttempts ?? 15,
+  //     getState: () => this.getBrowserState(),
+  //     buildUserPrompt: () => '',
+  //     executeAction: (action) =>
+  //       this.executeBrowserAction(action, {
+  //         navigateTimeoutMs: opts.navigateTimeoutMs ?? 15000,
+  //         clickTimeoutMs: opts.clickTimeoutMs ?? 35000,
+  //       }),
+  //     handleFinish: opts.handleFinish,
+  //     finishRequirements: opts.finishRequirements,
+  //   });
+  // }
 }

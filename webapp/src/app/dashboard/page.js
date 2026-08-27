@@ -10,14 +10,25 @@ import BottomAgentDock from "@/components/office/BottomAgentDock";
 import MemoryKnowledgeModal from "@/components/office/MemoryKnowledgeModal";
 import ConferenceRoomModal from "@/components/office/ConferenceRoomModal";
 import DundieTracker from "@/components/office/DundieTracker";
+import MichaelScottOSModal from "@/components/office/MichaelScottOSModal";
 import { playRetroSound } from "@/lib/retroAudio";
 
 export default function DedicatedOfficeApp() {
   const [agents, setAgents] = useState(INITIAL_AGENTS);
-  const [selectedAgent, setSelectedAgent] = useState(INITIAL_AGENTS[0]); // Default to Michael Scott
+  const [selectedAgent, setSelectedAgent] = useState(null); // Unlocked on page load
   const [isMemoryOpen, setIsMemoryOpen] = useState(false);
   const [isConferenceOpen, setIsConferenceOpen] = useState(false);
   const [isDundiesOpen, setIsDundiesOpen] = useState(false);
+  const [isMichaelOSOpen, setIsMichaelOSOpen] = useState(false);
+
+  // Handle agent selection & trigger Michael Scott Executive XP OS modal
+  const handleSelectAgent = (agent) => {
+    setSelectedAgent(agent);
+    if (agent?.id === "michael") {
+      playRetroSound("chime");
+      setIsMichaelOSOpen(true);
+    }
+  };
 
   // Update specific agent state
   const handleUpdateAgent = (agentId, updates) => {
@@ -94,7 +105,7 @@ export default function DedicatedOfficeApp() {
   };
 
   return (
-    <div className="flex flex-col h-screen w-screen bg-[#0c0f12] text-[#f3f4f6] font-mono overflow-hidden select-none">
+    <div className="flex flex-col h-screen w-screen bg-[#fdf6e3] text-[#073642] font-mono overflow-hidden select-none">
       
       {/* 1. TOP HEADER BAR: Knowledge, Memory (MemPalace), Conference, Dundies & Audio */}
       <TopHeaderBar
@@ -109,11 +120,11 @@ export default function DedicatedOfficeApp() {
       <div className="flex flex-1 overflow-hidden">
         
         {/* Left: 2D Interactive Office Floor Map with Human Pixel Figures */}
-        <div className="flex-1 overflow-y-auto p-3 bg-[#0c0f12]">
+        <div className="flex-1 overflow-y-auto p-3 bg-[#fdf6e3]">
           <OfficeFloorMap
             agents={agents}
             selectedAgentId={selectedAgent?.id}
-            onSelectAgent={(agent) => setSelectedAgent(agent)}
+            onSelectAgent={handleSelectAgent}
             onOpenConference={() => setIsConferenceOpen(true)}
             onTriggerCoffee={handleOfficeCoffeeBreak}
             onOpenDundies={() => setIsDundiesOpen(true)}
@@ -134,15 +145,25 @@ export default function DedicatedOfficeApp() {
       <BottomAgentDock
         agents={agents}
         selectedAgentId={selectedAgent?.id}
-        onSelectAgent={(agent) => setSelectedAgent(agent)}
+        onSelectAgent={handleSelectAgent}
       />
 
-      {/* Modal 1: Memory & Knowledge Base (MemPalace) */}
+      {/* Modal 1: Michael Scott 90s CRT Monitor Windows XP OS */}
+      {isMichaelOSOpen && (
+        <MichaelScottOSModal
+          agents={agents}
+          onClose={() => setIsMichaelOSOpen(false)}
+          onDispatchTask={handleDispatchTask}
+          onUpdateAgent={handleUpdateAgent}
+        />
+      )}
+
+      {/* Modal 2: Memory & Knowledge Base (MemPalace) */}
       {isMemoryOpen && (
         <MemoryKnowledgeModal onClose={() => setIsMemoryOpen(false)} />
       )}
 
-      {/* Modal 2: Conference Room Multi-Agent Debates */}
+      {/* Modal 3: Conference Room Multi-Agent Debates */}
       {isConferenceOpen && (
         <ConferenceRoomModal
           agents={agents}
@@ -150,7 +171,7 @@ export default function DedicatedOfficeApp() {
         />
       )}
 
-      {/* Modal 3: Dundie Awards Leaderboard */}
+      {/* Modal 4: Dundie Awards Leaderboard */}
       {isDundiesOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 overflow-y-auto font-mono">
           <div className="w-full max-w-4xl">

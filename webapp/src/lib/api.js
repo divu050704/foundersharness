@@ -8,9 +8,19 @@ const formatUrl = (endpoint) => {
   return `${BASE_URL}/api${cleanEndpoint}`;
 };
 
+const getAuthHeaders = () => {
+  if (typeof window === "undefined") return {};
+  const token =
+    localStorage.getItem("token") ||
+    localStorage.getItem("auth_token") ||
+    localStorage.getItem("bearer_token") ||
+    sessionStorage.getItem("token");
+  return token ? { Authorization: `Bearer ${token}` } : {};
+};
+
 /**
  * Lightweight API client wrapping native fetch API.
- * Routes automatically to NestJS global prefix (/api).
+ * Routes automatically to NestJS global prefix (/api) with credentials & Bearer Auth support.
  */
 export const api = {
   async get(endpoint, options = {}) {
@@ -19,12 +29,14 @@ export const api = {
       method: "GET",
       headers: {
         "Content-Type": "application/json",
+        ...getAuthHeaders(),
         ...options.headers,
       },
+      credentials: "include",
       ...options,
     });
     if (!res.ok) {
-      throw new Error(`API Error: ${res.status} ${res.statusText}`);
+      throw new Error(`API Error ${res.status}: ${res.statusText}`);
     }
     return res.json();
   },
@@ -35,14 +47,15 @@ export const api = {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
+        ...getAuthHeaders(),
         ...options.headers,
       },
       body: JSON.stringify(data),
+      credentials: "include",
       ...options,
-      credentials: "include"
     });
     if (!res.ok) {
-      throw new Error(`API Error: ${res.status} ${res.statusText}`);
+      throw new Error(`API Error ${res.status}: ${res.statusText}`);
     }
     return res.json();
   },
@@ -53,13 +66,15 @@ export const api = {
       method: "PUT",
       headers: {
         "Content-Type": "application/json",
+        ...getAuthHeaders(),
         ...options.headers,
       },
       body: JSON.stringify(data),
+      credentials: "include",
       ...options,
     });
     if (!res.ok) {
-      throw new Error(`API Error: ${res.status} ${res.statusText}`);
+      throw new Error(`API Error ${res.status}: ${res.statusText}`);
     }
     return res.json();
   },
@@ -70,12 +85,14 @@ export const api = {
       method: "DELETE",
       headers: {
         "Content-Type": "application/json",
+        ...getAuthHeaders(),
         ...options.headers,
       },
+      credentials: "include",
       ...options,
     });
     if (!res.ok) {
-      throw new Error(`API Error: ${res.status} ${res.statusText}`);
+      throw new Error(`API Error ${res.status}: ${res.statusText}`);
     }
     return res.json();
   },

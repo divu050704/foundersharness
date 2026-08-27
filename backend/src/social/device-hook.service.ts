@@ -1,14 +1,16 @@
-import {
-  Injectable,
-  Logger,
-  OnModuleInit,
-  OnModuleDestroy,
-} from '@nestjs/common';
+// import {
+//   Injectable,
+//   Logger,
+//   OnModuleInit,
+//   OnModuleDestroy,
+// } from '@nestjs/common';
 import WebSocket from 'ws';
 
-@Injectable()
-export class DeviceHookService implements OnModuleInit, OnModuleDestroy {
-  private readonly logger = new Logger(DeviceHookService.name);
+// @Injectable()
+// export class DeviceHookService implements OnModuleInit, OnModuleDestroy {
+export class DeviceHookService{
+
+  // private readonly logger = new Logger(DeviceHookService.name);
   private ws: WebSocket | null = null;
   private readonly wsUrl = 'ws://localhost:9000/';
   private pendingRequests = new Map<string, (value: any) => void>();
@@ -30,7 +32,7 @@ export class DeviceHookService implements OnModuleInit, OnModuleDestroy {
       this.reconnectTimeout = null;
     }
 
-    this.logger.log(`Connecting to device-hook WebSocket at ${this.wsUrl}...`);
+    // this.logger.log(`Connecting to device-hook WebSocket at ${this.wsUrl}...`);
 
     try {
       const socket = new WebSocket(this.wsUrl);
@@ -38,7 +40,7 @@ export class DeviceHookService implements OnModuleInit, OnModuleDestroy {
 
       socket.on('open', () => {
         this.isConnected = true;
-        this.logger.log('Successfully connected to device-hook C# helper.');
+        // this.logger.log('Successfully connected to device-hook C# helper.');
       });
 
       socket.on('message', (data: WebSocket.Data) => {
@@ -52,28 +54,28 @@ export class DeviceHookService implements OnModuleInit, OnModuleDestroy {
             }
           }
         } catch (err) {
-          this.logger.error(
-            'Failed to parse WebSocket message from device-hook:',
-            err,
-          );
+          // this.logger.error(
+            // 'Failed to parse WebSocket message from device-hook:',
+            // err,
+          // );
         }
       });
 
       socket.on('close', () => {
         this.isConnected = false;
-        this.logger.warn(
-          'Connection to device-hook closed. Retrying in 5 seconds...',
-        );
+        // this.logger.warn(
+        //   'Connection to device-hook closed. Retrying in 5 seconds...',
+        // );
         this.scheduleReconnect();
       });
 
       socket.on('error', (err) => {
         this.isConnected = false;
-        this.logger.error(`device-hook WebSocket error: ${err.message}`);
+        // this.logger.error(`device-hook WebSocket error: ${err.message}`);
       });
     } catch (error) {
       this.isConnected = false;
-      this.logger.error('Error establishing WebSocket connection:', error);
+      // this.logger.error('Error establishing WebSocket connection:', error);
       this.scheduleReconnect();
     }
   }
@@ -107,7 +109,7 @@ export class DeviceHookService implements OnModuleInit, OnModuleDestroy {
 
   setActiveSessionName(name: string) {
     this.activeSessionName = name || 'default';
-    this.logger.log(`Active browser session set to: ${this.activeSessionName}`);
+    // this.logger.log(`Active browser session set to: ${this.activeSessionName}`);
   }
 
   getActiveSessionName(): string {

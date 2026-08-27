@@ -4,9 +4,10 @@ import { UserService } from './user.service';
 import { User,UserSchema } from './schemas/user.schema';
 import { MongooseModule } from '@nestjs/mongoose';
 import { AgentsService } from '../agents/agents.service';
+import { Neo4jStore } from '../memory/neo4j.store';
 @Module({
   imports: [MongooseModule.forFeature([{ name: User.name, schema: UserSchema }])],
   controllers: [UserController],
-  providers: [UserService, AgentsService]
+  providers: [UserService, AgentsService, Neo4jStore]
 })
 export class UserModule {}

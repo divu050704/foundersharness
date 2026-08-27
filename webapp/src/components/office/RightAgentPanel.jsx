@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Send, Award, Coffee, Terminal, Brain, Cpu, CheckCircle2, ShieldCheck, Share2, DollarSign, Calendar, Users, Monitor } from "lucide-react";
+import { Send, Award, Coffee, Terminal } from "lucide-react";
 import PixelHumanFigure from "./PixelHumanFigure";
 import { playRetroSound } from "@/lib/retroAudio";
 
@@ -11,10 +11,10 @@ export default function RightAgentPanel({ agent, onUpdateAgent, onDispatchTask }
 
   if (!agent) {
     return (
-      <div className="bg-[#141a22] border-l-4 border-[#2e3e50] p-6 text-center font-mono text-slate-400 flex flex-col items-center justify-center h-full">
-        <Terminal className="size-8 text-slate-600 mb-2" />
-        <p className="font-pixel text-xs text-slate-300">NO AGENT SELECTED</p>
-        <p className="text-[10px] text-slate-500 mt-1">Select any agent from the floor or bottom dock</p>
+      <div className="bg-[#eee8d5] border-l-4 border-[#b58900] p-6 text-center font-mono text-[#586e75] flex flex-col items-center justify-center h-full">
+        <Terminal className="size-8 text-[#93a1a1] mb-2" />
+        <p className="font-pixel text-xs text-[#073642]">NO AGENT SELECTED</p>
+        <p className="text-[10px] text-[#586e75] mt-1">Select any agent from the floor or bottom dock</p>
       </div>
     );
   }
@@ -66,31 +66,31 @@ export default function RightAgentPanel({ agent, onUpdateAgent, onDispatchTask }
   const isWorking = agent.status === "working" || agent.status === "thinking";
 
   return (
-    <div className="bg-[#141a22] border-l-4 border-[#2e3e50] flex flex-col h-full font-mono text-slate-100 shadow-2xl crt-overlay select-none">
+    <div className="bg-[#eee8d5] border-l-4 border-[#b58900] flex flex-col h-full font-mono text-[#073642] shadow-2xl select-none">
       
       {/* Header Profile Section */}
-      <div className="p-4 border-b border-[#2e3e50] bg-[#18202a] flex items-center justify-between gap-3">
+      <div className="p-4 border-b border-[#b58900]/40 bg-[#fdf6e3] flex items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <div className="relative">
             <PixelHumanFigure agentId={agent.id} size="md" isWorking={isWorking} />
             <span
-              className={`absolute -bottom-1 -right-1 size-3 rounded-full border-2 border-[#18202a] ${
+              className={`absolute -bottom-1 -right-1 size-3 rounded-full border-2 border-[#fdf6e3] ${
                 agent.status === "working"
-                  ? "bg-emerald-400 animate-pulse"
+                  ? "bg-[#859900] animate-pulse"
                   : agent.status === "thinking"
-                  ? "bg-cyan-400 animate-ping"
-                  : "bg-slate-400"
+                  ? "bg-[#268bd2] animate-ping"
+                  : "bg-[#93a1a1]"
               }`}
             />
           </div>
 
           <div>
             <div className="flex items-center gap-2">
-              <h3 className="font-pixel text-sm text-white">{agent.name}</h3>
+              <h3 className="font-pixel text-sm text-[#073642] font-bold">{agent.name}</h3>
               {agent.id === "michael" && <span title="God Agent Presiding">👑</span>}
             </div>
-            <p className="text-[11px] text-slate-400">{agent.officeRole}</p>
-            <span className="text-[9px] font-pixel text-[#f59e0b] bg-[#f59e0b]/10 border border-[#f59e0b]/40 px-1.5 py-0.5 rounded mt-1 inline-block">
+            <p className="text-[11px] text-[#586e75] font-bold">{agent.officeRole}</p>
+            <span className="text-[9px] font-pixel text-[#b58900] bg-[#b58900]/10 border border-[#b58900]/40 px-1.5 py-0.5 rounded mt-1 inline-block font-bold">
               {agent.harnessDomain || agent.aiModel}
             </span>
           </div>
@@ -98,12 +98,12 @@ export default function RightAgentPanel({ agent, onUpdateAgent, onDispatchTask }
       </div>
 
       {/* Action Toolbar */}
-      <div className="p-2.5 bg-[#0f1419] border-b border-[#2e3e50] flex flex-wrap items-center justify-between gap-2 text-xs">
+      <div className="p-2.5 bg-[#eee8d5] border-b border-[#b58900]/30 flex flex-wrap items-center justify-between gap-2 text-xs">
         <div className="flex items-center gap-2">
           <button
             type="button"
             onClick={handleRewardDundie}
-            className="flex items-center gap-1 bg-amber-500/20 text-amber-400 border border-amber-500/50 hover:bg-amber-500/30 px-2 py-1 rounded font-pixel text-[9px] cursor-pointer"
+            className="flex items-center gap-1 bg-[#b58900] text-[#fdf6e3] border border-[#b58900] hover:bg-[#a17a00] px-2 py-1 rounded font-pixel text-[9px] cursor-pointer font-bold"
           >
             <Award className="size-3" />
             <span>+50 Dundie</span>
@@ -112,7 +112,7 @@ export default function RightAgentPanel({ agent, onUpdateAgent, onDispatchTask }
           <button
             type="button"
             onClick={handleGiveCoffee}
-            className="flex items-center gap-1 bg-[#24303e] hover:bg-[#2c3b4e] text-slate-200 border border-[#2e3e50] px-2 py-1 rounded font-pixel text-[9px] cursor-pointer"
+            className="flex items-center gap-1 bg-[#cb4b16]/20 text-[#cb4b16] border border-[#cb4b16]/50 hover:bg-[#cb4b16]/30 px-2 py-1 rounded font-pixel text-[9px] cursor-pointer font-bold"
           >
             <Coffee className="size-3" />
             <span>Coffee ☕ ({agent.coffeeCups})</span>
@@ -122,7 +122,7 @@ export default function RightAgentPanel({ agent, onUpdateAgent, onDispatchTask }
         <select
           value={selectedModel}
           onChange={(e) => handleModelChange(e.target.value)}
-          className="bg-[#141a22] border border-[#2e3e50] rounded text-[10px] px-2 py-1 font-mono text-slate-200 focus:outline-none focus:border-[#f59e0b] cursor-pointer"
+          className="bg-[#fdf6e3] border border-[#b58900]/50 rounded text-[10px] px-2 py-1 font-mono text-[#073642] font-bold focus:outline-none focus:border-[#cb4b16] cursor-pointer"
         >
           <option value="Claude 3.7 Sonnet">Claude 3.7 Sonnet</option>
           <option value="Claude 3.5 Haiku">Claude 3.5 Haiku</option>
@@ -134,12 +134,12 @@ export default function RightAgentPanel({ agent, onUpdateAgent, onDispatchTask }
       </div>
 
       {/* Active Task & Thought Banner */}
-      <div className="p-3 bg-[#18202a] border-b border-[#2e3e50] space-y-1">
-        <div className="text-[10px] text-slate-400 uppercase font-bold flex items-center justify-between">
+      <div className="p-3 bg-[#fdf6e3] border-b border-[#b58900]/30 space-y-1">
+        <div className="text-[10px] text-[#586e75] uppercase font-bold flex items-center justify-between">
           <span>Active Harness Task</span>
-          <span className="text-[#f59e0b] font-pixel text-[9px]">{agent.status.toUpperCase()}</span>
+          <span className="text-[#cb4b16] font-pixel text-[9px] font-bold">{agent.status.toUpperCase()}</span>
         </div>
-        <p className="text-xs text-white bg-[#0f1419] p-2 rounded border border-[#2e3e50] truncate font-mono">
+        <p className="text-xs text-[#073642] font-bold bg-[#eee8d5] p-2 rounded border border-[#b58900]/40 truncate font-mono">
           {agent.activeTask}
         </p>
       </div>
@@ -147,16 +147,16 @@ export default function RightAgentPanel({ agent, onUpdateAgent, onDispatchTask }
       {/* Live Agent Terminal Log Stream */}
       <div className="flex-1 p-3 overflow-hidden flex flex-col">
         <div className="flex items-center justify-between mb-2">
-          <span className="font-pixel text-[10px] text-[#f59e0b] flex items-center gap-1.5">
+          <span className="font-pixel text-[10px] text-[#cb4b16] font-bold flex items-center gap-1.5">
             <Terminal className="size-3.5" /> AGENT TERMINAL OUTPUT
           </span>
-          <span className="text-[9px] text-slate-500">Live Backend Stream</span>
+          <span className="text-[9px] text-[#586e75] font-bold">Live Stream</span>
         </div>
 
-        <div className="flex-1 bg-black/90 text-emerald-400 p-3 rounded-lg border border-emerald-900/60 font-mono text-[11px] leading-relaxed overflow-y-auto space-y-1.5 shadow-inner">
+        <div className="flex-1 bg-[#073642] text-[#859900] p-3 rounded-lg border border-[#268bd2] font-mono text-[11px] leading-relaxed overflow-y-auto space-y-1.5 shadow-inner">
           {agent.logs.map((log, idx) => (
             <div key={idx} className="break-words">
-              <span className="text-slate-500 mr-1.5">[{new Date().toLocaleTimeString()}]</span>
+              <span className="text-[#93a1a1] mr-1.5">[{new Date().toLocaleTimeString()}]</span>
               <span>{log}</span>
             </div>
           ))}
@@ -164,19 +164,19 @@ export default function RightAgentPanel({ agent, onUpdateAgent, onDispatchTask }
       </div>
 
       {/* Direct Task Dispatch Box */}
-      <div className="p-3 bg-[#18202a] border-t border-[#2e3e50]">
+      <div className="p-3 bg-[#fdf6e3] border-t border-[#b58900]/30">
         <form onSubmit={handleSendPrompt} className="flex items-center gap-2">
           <input
             type="text"
             value={customPrompt}
             onChange={(e) => setCustomPrompt(e.target.value)}
             placeholder={`Command ${agent.name.split(" ")[0]}...`}
-            className="flex-1 bg-[#0f1419] border border-[#2e3e50] px-3 py-2 text-xs rounded text-white placeholder:text-slate-500 focus:outline-none focus:border-[#f59e0b]"
+            className="flex-1 bg-[#eee8d5] border border-[#b58900]/50 px-3 py-2 text-xs rounded text-[#073642] font-bold placeholder:text-[#586e75] focus:outline-none focus:border-[#cb4b16]"
           />
           <button
             type="submit"
             disabled={!customPrompt.trim()}
-            className="bg-[#f59e0b] hover:bg-[#d97706] text-slate-950 font-pixel text-[9px] px-3 py-2 rounded border border-[#f59e0b] flex items-center gap-1 cursor-pointer font-bold disabled:opacity-50"
+            className="bg-[#cb4b16] hover:bg-[#a33b11] text-[#fdf6e3] font-pixel text-[9px] px-3 py-2 rounded border border-[#cb4b16] flex items-center gap-1 cursor-pointer font-bold disabled:opacity-50"
           >
             <Send className="size-3" />
             <span>Dispatch</span>
