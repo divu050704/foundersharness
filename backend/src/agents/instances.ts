@@ -182,7 +182,7 @@ You must return a JSON object conforming to the following structure:
   "thought": "brief reasoning explaining what you observe",
   "action": "navigate" | "click" | "wait" | "finish",
   "url": "optional URL to navigate to (if action is navigate)",
-  "selector": "optional CSS selector to click (if action is click)",
+  "selector": "valid Playwright/CSS selector to click, e.g. 'a[href*=\"...\"]', 'role=link[name=\"...\"]', or 'button:has-text(\"...\")' (if action is click)",
   "ms": 2000,
   "connected": true | false,
   "confidence": "high" | "medium" | "low",

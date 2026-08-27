@@ -631,6 +631,96 @@ namespace foundersharness
 
                 switch (action.ToLower())
                 {
+                    case "snapshot":
+                    {
+                        string snapshotScript = @"
+                            (() => {
+                                document.querySelectorAll('[data-agent-ref]').forEach(el => el.removeAttribute('data-agent-ref'));
+                                const selectors = 'a, button, input, textarea, select, [role], [onclick], [tabindex]';
+                                const nodes = Array.from(document.querySelectorAll(selectors));
+                                const results = [];
+                                const stack = []; // ancestor stack of { el, ref } for currently-open containers
+                                let i = 0;
+
+                                for (const el of nodes) {
+                                    const rect = el.getBoundingClientRect();
+                                    if (rect.width === 0 || rect.height === 0) continue;
+                                    const style = window.getComputedStyle(el);
+                                    if (style.visibility === 'hidden' || style.display === 'none') continue;
+
+                                    // Pop any ancestors on the stack that don't actually contain this element
+                                    while (stack.length && !stack[stack.length - 1].el.contains(el)) {
+                                        stack.pop();
+                                    }
+
+                                    const ref = 'r' + (i++);
+                                    el.setAttribute('data-agent-ref', ref);
+
+                                    const role = el.getAttribute('role') || el.tagName.toLowerCase();
+                                    const aria = el.getAttribute('aria-label');
+                                    const alt = el.getAttribute('alt');
+                                    const placeholder = el.getAttribute('placeholder');
+                                    const value = el.value;
+                                    // Full text content, NOT hard-capped at a tiny length. Cap generously
+                                    // just to avoid pathological multi-KB nodes, with a visible marker if cut.
+                                    let fullText = (el.innerText || '').trim();
+                                    if (fullText.length > 2000) fullText = fullText.slice(0, 2000) + ' …[truncated]';
+                                    const name = (aria || fullText || alt || placeholder || value || '').trim();
+
+                                    const parentRef = stack.length ? stack[stack.length - 1].ref : null;
+                                    const depth = stack.length;
+
+                                    results.push({ ref, tag: el.tagName.toLowerCase(), role, name, parentRef, depth });
+
+                                    stack.push({ el, ref });
+                                }
+
+                                return JSON.stringify(results);
+                            })()
+                        ";
+                        var snapshotJson = await _activePage.EvaluateAsync<string>(snapshotScript);
+                        return CreateResponseJson(id, "success", snapshotJson);
+                    }
+
+                    case "click_ref":
+                    {
+                        if (!root.TryGetProperty("ref", out var refProp))
+                            return CreateResponseJson(id, "error", null, "Missing 'ref' parameter for click_ref action.");
+                        string refSel = $"[data-agent-ref=\"{refProp.GetString()}\"]";
+                        try
+                        {
+                            await _activePage.ClickAsync(refSel, new PageClickOptions { Timeout = 3000 });
+                            return CreateResponseJson(id, "success", $"Clicked ref {refProp.GetString()}");
+                        }
+                        catch (Exception ex)
+                        {
+                            try
+                            {
+                                await _activePage.Locator(refSel).First.EvaluateAsync("el => el.click()");
+                                return CreateResponseJson(id, "success", $"Clicked ref {refProp.GetString()} (JS fallback)");
+                            }
+                            catch (Exception jsEx)
+                            {
+                                return CreateResponseJson(id, "error", null, $"click_ref failed: {ex.Message} / JS fallback: {jsEx.Message}");
+                            }
+                        }
+                    }
+
+                    case "fill_ref":
+                    {
+                        if (!root.TryGetProperty("ref", out var fillRefProp) || !root.TryGetProperty("text", out var fillTextProp))
+                            return CreateResponseJson(id, "error", null, "Missing 'ref' or 'text' parameter for fill_ref action.");
+                        string fillRefSel = $"[data-agent-ref=\"{fillRefProp.GetString()}\"]";
+                        try
+                        {
+                            await _activePage.FillAsync(fillRefSel, fillTextProp.GetString() ?? "");
+                            return CreateResponseJson(id, "success", $"Filled ref {fillRefProp.GetString()}");
+                        }
+                        catch (Exception ex)
+                        {
+                            return CreateResponseJson(id, "error", null, $"fill_ref failed: {ex.Message}");
+                        }
+                    }
                     case "navigate":
                         if (!root.TryGetProperty("url", out var urlProp))
                             return CreateResponseJson(id, "error", null, "Missing 'url' parameter for navigate action.");
@@ -648,29 +738,7 @@ namespace foundersharness
                         if (root.TryGetProperty("force", out var forceProp))
                             force = forceProp.GetBoolean();
 
-                        var selectorFallbacks = new List<string> { clickSel };
-
-                        // 1. Tag name replacement (e.g. button[attr] -> div[attr], span[attr], etc.)
-                        var match = System.Text.RegularExpressions.Regex.Match(clickSel.Trim(), @"^([a-zA-Z0-9\-]+)(\[.*\])$");
-                        if (match.Success)
-                        {
-                            var originalTag = match.Groups[1].Value;
-                            var attributes = match.Groups[2].Value;
-                            var fallbackTags = new[] { "div", "span", "a", "svg", "button", "*" };
-                            foreach (var tag in fallbackTags)
-                            {
-                                if (tag != originalTag)
-                                {
-                                    selectorFallbacks.Add(tag + attributes);
-                                }
-                            }
-                        }
-
-                        // 2. Child elements within target (e.g. selector + " svg", selector + " span", etc.)
-                        selectorFallbacks.Add(clickSel + " svg");
-                        selectorFallbacks.Add(clickSel + " span");
-                        selectorFallbacks.Add(clickSel + " div");
-                        selectorFallbacks.Add(clickSel + " a");
+                        var selectorFallbacks = GetSelectorCandidates(clickSel);
 
                         bool clickedSuccessfully = false;
                         Exception? lastClickException = null;
@@ -679,15 +747,25 @@ namespace foundersharness
                         {
                             try
                             {
-                                // Check if element is present to avoid waiting for Playwright click timeout
-                                var count = await _activePage.Locator(targetSel).CountAsync();
+                                var locator = _activePage.Locator(targetSel);
+                                var count = await locator.CountAsync();
                                 if (count == 0)
                                 {
-                                    continue;
+                                    try
+                                    {
+                                        await locator.First.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Attached, Timeout = 1000 });
+                                        count = await locator.CountAsync();
+                                    }
+                                    catch
+                                    {
+                                        continue;
+                                    }
                                 }
 
+                                if (count == 0) continue;
+
                                 Log($"Clicking {targetSel}");
-                                // First attempt: Playwright standard click with a short timeout
+                                // First attempt: Playwright standard click with short timeout
                                 await _activePage.ClickAsync(targetSel, new PageClickOptions { Force = force, Timeout = 2000 });
                                 Log($"Successfully clicked selector via Playwright: {targetSel}");
                                 clickedSuccessfully = true;
@@ -712,9 +790,25 @@ namespace foundersharness
                             }
                         }
 
+                        // If no candidates matched via CountAsync/WaitForAsync, do one final Playwright Click attempt on the original selector
+                        if (!clickedSuccessfully && lastClickException == null)
+                        {
+                            try
+                            {
+                                Log($"Clicking primary selector directly: {clickSel}");
+                                await _activePage.ClickAsync(clickSel, new PageClickOptions { Force = force, Timeout = 2500 });
+                                clickedSuccessfully = true;
+                            }
+                            catch (Exception ex)
+                            {
+                                lastClickException = new Exception($"Element '{clickSel}' not found on page (Searched candidates: {string.Join(", ", selectorFallbacks)}). Error: {ex.Message}");
+                            }
+                        }
+
                         if (!clickedSuccessfully)
                         {
-                            return CreateResponseJson(id, "error", null, $"Click failed for all selector variants. Last error: {lastClickException?.Message}");
+                            string errMsg = lastClickException?.Message ?? $"Element '{clickSel}' was not found in the DOM.";
+                            return CreateResponseJson(id, "error", null, $"Click failed for selector variants of '{clickSel}'. Last error: {errMsg}");
                         }
                         return CreateResponseJson(id, "success", $"Clicked selector {clickSel}");
 
@@ -723,7 +817,26 @@ namespace foundersharness
                             return CreateResponseJson(id, "error", null, "Missing 'selector' or 'text' parameter for fill action.");
                         string fillSel = fillSelProp.GetString() ?? "";
                         string text = textProp.GetString() ?? "";
-                        await _activePage.FillAsync(fillSel, text);
+                        
+                        bool filled = false;
+                        Exception? fillEx = null;
+                        foreach (var targetSel in GetSelectorCandidates(fillSel))
+                        {
+                            try
+                            {
+                                if (await _activePage.Locator(targetSel).CountAsync() > 0)
+                                {
+                                    await _activePage.FillAsync(targetSel, text);
+                                    filled = true;
+                                    break;
+                                }
+                            }
+                            catch (Exception ex) { fillEx = ex; }
+                        }
+                        if (!filled)
+                        {
+                            return CreateResponseJson(id, "error", null, $"Fill failed for selector {fillSel}: {fillEx?.Message}");
+                        }
                         return CreateResponseJson(id, "success", $"Filled {fillSel} with text");
 
                     case "press":
@@ -731,7 +844,26 @@ namespace foundersharness
                             return CreateResponseJson(id, "error", null, "Missing 'selector' or 'key' parameter for press action.");
                         string pressSel = pressSelProp.GetString() ?? "";
                         string key = keyProp.GetString() ?? "";
-                        await _activePage.PressAsync(pressSel, key);
+                        
+                        bool pressed = false;
+                        Exception? pressEx = null;
+                        foreach (var targetSel in GetSelectorCandidates(pressSel))
+                        {
+                            try
+                            {
+                                if (await _activePage.Locator(targetSel).CountAsync() > 0)
+                                {
+                                    await _activePage.PressAsync(targetSel, key);
+                                    pressed = true;
+                                    break;
+                                }
+                            }
+                            catch (Exception ex) { pressEx = ex; }
+                        }
+                        if (!pressed)
+                        {
+                            return CreateResponseJson(id, "error", null, $"Press failed for selector {pressSel}: {pressEx?.Message}");
+                        }
                         return CreateResponseJson(id, "success", $"Pressed {key} on {pressSel}");
 
                     case "screenshot":
@@ -747,14 +879,38 @@ namespace foundersharness
                         if (!root.TryGetProperty("selector", out var textSelProp))
                             return CreateResponseJson(id, "error", null, "Missing 'selector' parameter for get_text action.");
                         string textSel = textSelProp.GetString() ?? "";
-                        string txtVal = await _activePage.TextContentAsync(textSel) ?? "";
+                        string txtVal = "";
+                        foreach (var targetSel in GetSelectorCandidates(textSel))
+                        {
+                            try
+                            {
+                                if (await _activePage.Locator(targetSel).CountAsync() > 0)
+                                {
+                                    txtVal = await _activePage.TextContentAsync(targetSel) ?? "";
+                                    break;
+                                }
+                            }
+                            catch { }
+                        }
                         return CreateResponseJson(id, "success", txtVal);
 
                     case "get_value":
                         if (!root.TryGetProperty("selector", out var valSelProp))
                             return CreateResponseJson(id, "error", null, "Missing 'selector' parameter for get_value action.");
                         string valSel = valSelProp.GetString() ?? "";
-                        string val = await _activePage.InputValueAsync(valSel) ?? "";
+                        string val = "";
+                        foreach (var targetSel in GetSelectorCandidates(valSel))
+                        {
+                            try
+                            {
+                                if (await _activePage.Locator(targetSel).CountAsync() > 0)
+                                {
+                                    val = await _activePage.InputValueAsync(targetSel) ?? "";
+                                    break;
+                                }
+                            }
+                            catch { }
+                        }
                         return CreateResponseJson(id, "success", val);
 
                     case "new_page":
@@ -1001,6 +1157,112 @@ namespace foundersharness
             }
 
             return success;
+        }
+
+        private static List<string> GetSelectorCandidates(string rawSelector)
+        {
+            var candidates = new List<string>();
+            if (string.IsNullOrWhiteSpace(rawSelector)) return candidates;
+
+            string trimmed = rawSelector.Trim();
+
+            // 1. Check if rawSelector is in ARIA snapshot format: e.g. 'link "leeglin_india\'s profile picture"'
+            var ariaMatch = System.Text.RegularExpressions.Regex.Match(
+                trimmed,
+                @"^(link|button|heading|textbox|img|checkbox|radio|combobox|tab|menuitem|option|dialog|region|group|article|listitem)\s+[""](.*)[""]$",
+                System.Text.RegularExpressions.RegexOptions.IgnoreCase
+            );
+
+            if (!ariaMatch.Success)
+            {
+                ariaMatch = System.Text.RegularExpressions.Regex.Match(
+                    trimmed,
+                    @"^(link|button|heading|textbox|img|checkbox|radio|combobox|tab|menuitem|option|dialog|region|group|article|listitem)\s+['](.*)[']$",
+                    System.Text.RegularExpressions.RegexOptions.IgnoreCase
+                );
+            }
+
+            if (ariaMatch.Success)
+            {
+                string role = ariaMatch.Groups[1].Value.ToLower();
+                string name = ariaMatch.Groups[2].Value;
+
+                string escapedDouble = name.Replace("\"", "\\\"");
+
+                candidates.Add($"role={role}[name=\"{escapedDouble}\"]");
+                candidates.Add($"internal:role={role}[name=\"{escapedDouble}\"]");
+                candidates.Add($"text=\"{escapedDouble}\"");
+                candidates.Add($":has-text(\"{escapedDouble}\")");
+
+                if (role == "link")
+                {
+                    candidates.Add($"a:has-text(\"{escapedDouble}\")");
+                    candidates.Add($"a[aria-label=\"{escapedDouble}\"]");
+                    candidates.Add($"a[alt=\"{escapedDouble}\"]");
+                    candidates.Add($"img[alt=\"{escapedDouble}\"]");
+                }
+                else if (role == "button")
+                {
+                    candidates.Add($"button:has-text(\"{escapedDouble}\")");
+                    candidates.Add($"button[aria-label=\"{escapedDouble}\"]");
+                    candidates.Add($"input[type=\"button\"][value=\"{escapedDouble}\"]");
+                    candidates.Add($"input[type=\"submit\"][value=\"{escapedDouble}\"]");
+                }
+                else if (role == "textbox")
+                {
+                    candidates.Add($"input[placeholder=\"{escapedDouble}\"]");
+                    candidates.Add($"input[aria-label=\"{escapedDouble}\"]");
+                    candidates.Add($"textarea[placeholder=\"{escapedDouble}\"]");
+                }
+                else if (role == "img")
+                {
+                    candidates.Add($"img[alt=\"{escapedDouble}\"]");
+                    candidates.Add($"img[aria-label=\"{escapedDouble}\"]");
+                }
+
+                candidates.Add($"[aria-label=\"{escapedDouble}\"]");
+                candidates.Add($"[alt=\"{escapedDouble}\"]");
+                candidates.Add($"[title=\"{escapedDouble}\"]");
+
+                return candidates;
+            }
+
+            // 2. Already Playwright engine selector
+            if (trimmed.StartsWith("role=") || trimmed.StartsWith("text=") || trimmed.StartsWith("xpath=") || trimmed.StartsWith("internal:"))
+            {
+                candidates.Add(trimmed);
+                return candidates;
+            }
+
+            // 3. CSS Selector
+            candidates.Add(trimmed);
+
+            // Tag name replacement fallback
+            var match = System.Text.RegularExpressions.Regex.Match(trimmed, @"^([a-zA-Z0-9\-]+)(\[.*\])$");
+            if (match.Success)
+            {
+                var originalTag = match.Groups[1].Value;
+                var attributes = match.Groups[2].Value;
+                var fallbackTags = new[] { "div", "span", "a", "svg", "button", "*" };
+                foreach (var tag in fallbackTags)
+                {
+                    if (tag != originalTag)
+                    {
+                        candidates.Add(tag + attributes);
+                    }
+                }
+            }
+
+            // Child element fallbacks ONLY for simple CSS selectors without quotes or spaces
+            if (!trimmed.Contains("\"") && !trimmed.Contains("'") && !trimmed.Contains(" "))
+            {
+                candidates.Add(trimmed + " svg");
+                candidates.Add(trimmed + " span");
+                candidates.Add(trimmed + " div");
+                candidates.Add(trimmed + " a");
+            }
+
+            return candidates;
         }
 
         #endregion
