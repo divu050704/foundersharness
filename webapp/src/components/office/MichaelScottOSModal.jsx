@@ -1,8 +1,10 @@
 "use client";
 
-import { CheckSquare, FileText, Mail, Minus, Send, Square } from "lucide-react";
-import { useState } from "react";
+import { CheckSquare, FileText, Mail, Minus, Send, Square, Paperclip } from "lucide-react";
+import { useState, useEffect } from "react";
 import { playRetroSound } from "@/lib/retroAudio";
+import { sendEmailToAgent } from "@/lib/emailAgentService";
+import { api } from "@/lib/api";
 import PixelHumanFigure from "./PixelHumanFigure";
 
 export default function MichaelScottOSModal({
@@ -12,99 +14,167 @@ export default function MichaelScottOSModal({
   onUpdateAgent,
 }) {
   const [activeApp, setActiveApp] = useState("email"); // "email" | "tasks" | "notes" | "mempalace"
-  const [selectedEmailAgent, setSelectedEmailAgent] = useState("dwight");
+  const [selectedEmailId, setSelectedEmailId] = useState("");
+  const [recipientEmail, setRecipientEmail] = useState("");
+  const [selectedAgentId, setSelectedAgentId] = useState("");
   const [emailSubject, setEmailSubject] = useState("");
   const [emailBody, setEmailBody] = useState("");
+  const [emailAttachments, setEmailAttachments] = useState("");
   const [sentNotification, setSentNotification] = useState("");
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [emails, setEmails] = useState([]);
 
-  // Sample Inbox Emails from Agents to Founder/Michael
-  const initialEmails = [
-    {
-      id: "dwight",
-      sender: "Dwight Schrute",
-      role: "Capital & Grants Scout",
-      subject: "RE: $100K NSF AI Innovation Grant Match Discovered!",
-      time: "10:14 AM",
-      unread: true,
-      body: "MICHAEL / FOUNDER,\n\nI have identified a non-dilutive $100,000 NSF AI Innovation Grant with zero equity loss! Application deadline is September 15th. I have already auto-drafted the 1-page executive summary.\n\nBears. Beets. Non-dilutive Capital.\n\n- Dwight",
-    },
-    {
-      id: "jim",
-      sender: "Jim Halpert",
-      role: "Browser Automation Agent",
-      subject: "RE: Playwright CDP Device-Hook Post Verified",
-      time: "09:48 AM",
-      unread: false,
-      body: "Hey Michael,\n\nJust published the scheduled founder update on LinkedIn & X using your authenticated Chrome profile (Port 9222). Zero API keys were needed and no captcha triggers encountered.\n\nLooking at camera...\n\n- Jim",
-    },
-    {
-      id: "pam",
-      sender: "Pam Beesly",
-      role: "Social Content Designer",
-      subject: "7-Day Founder Story Content Calendar Ready",
-      time: "09:30 AM",
-      unread: false,
-      body: "Hi Michael,\n\nThe 7-day social media post calendar is ready for your review. It includes 14 custom visual banners for LinkedIn, X & Threads.\n\nLet me know if you want any color palette adjustments!\n\n- Pam",
-    },
-    {
-      id: "stanley",
-      sender: "Stanley Hudson",
-      role: "Day Planner & Focus Manager",
-      subject: "Founder Schedule: 4-Hour Deep Work Block Protected",
-      time: "09:15 AM",
-      unread: false,
-      body: "Michael,\n\nI have blocked 9:00 AM - 1:00 PM on your calendar for uninterrupted deep work. I auto-declined two low-priority sales calls.\n\nDo not disturb during crossword time.\n\n- Stanley",
-    },
-    {
-      id: "ryan",
-      sender: "Ryan Howard",
-      role: "Tech Events & Meetup Scout",
-      subject: "AI Founder Demo Night - This Thursday 6:30 PM",
-      time: "08:45 AM",
-      unread: false,
-      body: "Michael,\n\nFound a high-density VC & founder networking event: 'AI Founder Demo Night' at the Innovation Hub. RSVPs are locked in.\n\n- Ryan",
-    },
-    {
-      id: "toby",
-      sender: "Toby Flenderson",
-      role: "Safety & Compliance Monitor",
-      subject: "Weekly Social Posting Rate Limit Report",
-      time: "08:30 AM",
-      unread: false,
-      body: "Michael,\n\nMonitoring human-like delay intervals (3.4s) on browser clicks. Zero shadowban flags detected across all social profiles.\n\n- Toby",
-    },
-    {
-      id: "angela",
-      sender: "Angela Martin",
-      role: "SaaS Budget Auditor",
-      subject: "Monthly LLM & Token Budget Audit Completed",
-      time: "08:00 AM",
-      unread: false,
-      body: "Michael,\n\nTotal daily automation cost is $0.12. I also flagged $240/mo in unused software subscriptions for instant cancellation.\n\nBandit is safe.\n\n- Angela",
-    },
-  ];
-
-  const [emails, setEmails] = useState(initialEmails);
+  // Fetch threads from backend DB on mount
+  useEffect(() => {
+    async function loadThreads() {
+      try {
+        const res = await api.get("/api/agents/threads");
+        if (Array.isArray(res) && res.length > 0) {
+          const formatted = res.flatMap((thread) => {
+            const subject = thread.subject || "No Subject";
+            return (thread.emails || []).map((email, idx) => {
+              const matchingAgent = agents.find(
+                (a) => a.email === email.receiver || a.email === email.sender
+              );
+              return {
+                id: thread._id ? `${thread._id}-${idx}` : `thread-${Date.now()}-${idx}`,
+                agentId: matchingAgent?.id || "agent",
+                sender: email.sender || "Founder / Michael Scott",
+                senderEmail: email.sender || "michael.scott@dundermifflin.com",
+                receiver: email.receiver || matchingAgent?.email || "",
+                role: matchingAgent?.officeRole || "Agent",
+                subject: subject,
+                time: email.createdAt
+                  ? new Date(email.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+                  : new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+                unread: false,
+                body: email.content || "",
+                attachments: email.attachments || [],
+              };
+            });
+          });
+          if (formatted.length > 0) {
+            setEmails(formatted);
+            setSelectedEmailId(formatted[0].id);
+          }
+        }
+      } catch (err) {
+        console.error("Failed to load threads from backend:", err);
+      }
+    }
+    loadThreads();
+  }, [agents]);
 
   const selectedEmail =
-    emails.find((e) => e.id === selectedEmailAgent) || emails[0];
+    emails.find((e) => e.id === selectedEmailId) || emails[0] || null;
 
-  const handleSendEmail = (e) => {
+  // Filter agent suggestions based on user input into recipient text field
+  const query = recipientEmail.trim().toLowerCase();
+  const suggestions = agents.filter((a) => {
+    if (!query) return true;
+    return (
+      a.name.toLowerCase().includes(query) ||
+      (a.email && a.email.toLowerCase().includes(query)) ||
+      a.id.toLowerCase().includes(query) ||
+      a.officeRole.toLowerCase().includes(query)
+    );
+  });
+
+  const handleSendEmail = async (e) => {
     e.preventDefault();
-    if (!emailBody.trim()) return;
+    if (!emailBody.trim() || !recipientEmail.trim()) return;
 
     playRetroSound("click");
-    onDispatchTask({
-      prompt: emailSubject ? `${emailSubject}: ${emailBody}` : emailBody,
-      targetAgent: selectedEmailAgent,
-    });
 
-    setSentNotification(
-      `Email sent to ${selectedEmail?.sender}! Task dispatched.`,
-    );
+    const attachmentList = emailAttachments
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
+
+    const subjectText = emailSubject.trim() || "New Task Instruction";
+    const targetEmail = recipientEmail.trim();
+
+    if (targetEmail.toLowerCase() === "all" || targetEmail.toLowerCase() === "all.agents@dundermifflin.com") {
+      const newThreads = [];
+      for (const agent of agents) {
+        const receiverEmail = agent.email || `${agent.id}@dundermifflin.com`;
+
+        sendEmailToAgent({
+          receiver: receiverEmail,
+          content: emailBody,
+          attachments: attachmentList,
+          subject: subjectText,
+        });
+
+        newThreads.push({
+          id: `thread-${Date.now()}-${agent.id}`,
+          agentId: agent.id,
+          sender: "Founder / Michael Scott",
+          senderEmail: "michael.scott@dundermifflin.com",
+          receiver: receiverEmail,
+          role: agent.officeRole,
+          subject: `[Broadcast] ${subjectText}`,
+          time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+          unread: false,
+          body: emailBody,
+          attachments: attachmentList,
+        });
+      }
+
+      setEmails((prev) => [...newThreads, ...prev]);
+      if (newThreads.length > 0) {
+        setSelectedEmailId(newThreads[0].id);
+      }
+      onDispatchTask({
+        prompt: `${subjectText}: ${emailBody}`,
+        targetAgent: "all",
+      });
+      setSentNotification("Broadcast email sent to all agents! Threads created.");
+    } else {
+      const targetAgentObj = agents.find(
+        (a) => a.email?.toLowerCase() === targetEmail.toLowerCase() || a.id === selectedAgentId
+      );
+
+      await sendEmailToAgent({
+        receiver: targetEmail,
+        content: emailBody,
+        attachments: attachmentList,
+        subject: subjectText,
+      });
+
+      const newThread = {
+        id: `thread-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+        agentId: targetAgentObj?.id || "agent",
+        sender: "Founder / Michael Scott",
+        senderEmail: "michael.scott@dundermifflin.com",
+        receiver: targetEmail,
+        role: targetAgentObj?.officeRole || "Agent",
+        subject: subjectText,
+        time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+        unread: false,
+        body: emailBody,
+        attachments: attachmentList,
+      };
+
+      setEmails((prev) => [newThread, ...prev]);
+      setSelectedEmailId(newThread.id);
+
+      onDispatchTask({
+        prompt: `${subjectText}: ${emailBody}`,
+        targetAgent: targetAgentObj?.id || "all",
+      });
+
+      setSentNotification(
+        `Email sent to ${targetAgentObj?.name || targetEmail}! Thread created.`
+      );
+    }
+
     setTimeout(() => setSentNotification(""), 4000);
+    setRecipientEmail("");
     setEmailSubject("");
     setEmailBody("");
+    setEmailAttachments("");
+    setShowSuggestions(false);
   };
 
   return (
@@ -289,75 +359,116 @@ export default function MichaelScottOSModal({
                       <div className="font-pixel text-[11px] text-[#0055ea] font-bold border-b border-[#7f9db9] pb-1.5 mb-2 flex items-center justify-between">
                         <span>📥 AGENT INBOX ({emails.length})</span>
                         <span className="text-[9px] text-slate-500">
-                          Live Agent Mail
+                          Live Threads
                         </span>
                       </div>
 
                       <div className="space-y-1.5 overflow-y-auto flex-1">
-                        {emails.map((item) => {
-                          const isSelected = item.id === selectedEmailAgent;
-                          return (
-                            <button
-                              type="button"
-                              key={item.id}
-                              onClick={() => {
-                                playRetroSound("click");
-                                setSelectedEmailAgent(item.id);
-                              }}
-                              className={`w-full text-left p-2 rounded border cursor-pointer transition-all ${
-                                isSelected
-                                  ? "bg-[#316ac5] text-white border-[#1c49b0] shadow"
-                                  : "bg-[#f8f9fa] hover:bg-[#ece9d8] text-[#222] border-[#ccd]"
-                              }`}
-                            >
-                              <div className="flex items-center justify-between text-[10px] font-bold">
-                                <span className="truncate">{item.sender}</span>
-                                <span
-                                  className={
-                                    isSelected
-                                      ? "text-amber-200"
-                                      : "text-slate-500"
-                                  }
-                                >
-                                  {item.time}
-                                </span>
-                              </div>
-                              <div
-                                className={`text-[10px] truncate mt-0.5 ${isSelected ? "text-slate-100 font-bold" : "text-slate-700"}`}
+                        {emails.length === 0 ? (
+                          <div className="p-4 text-center text-xs text-slate-500 font-mono flex flex-col items-center justify-center h-40">
+                            <Mail className="size-8 text-slate-300 mb-2 opacity-60" />
+                            <p className="font-bold text-slate-700">Inbox Empty</p>
+                            <p className="text-[10px] text-slate-400 mt-1">
+                              Enter an agent email below to compose your first email thread!
+                            </p>
+                          </div>
+                        ) : (
+                          emails.map((item) => {
+                            const isSelected = item.id === selectedEmailId;
+                            return (
+                              <button
+                                type="button"
+                                key={item.id}
+                                onClick={() => {
+                                  playRetroSound("click");
+                                  setSelectedEmailId(item.id);
+                                }}
+                                className={`w-full text-left p-2 rounded border cursor-pointer transition-all ${
+                                  isSelected
+                                    ? "bg-[#316ac5] text-white border-[#1c49b0] shadow"
+                                    : "bg-[#f8f9fa] hover:bg-[#ece9d8] text-[#222] border-[#ccd]"
+                                }`}
                               >
-                                {item.subject}
-                              </div>
-                            </button>
-                          );
-                        })}
+                                <div className="flex items-center justify-between text-[10px] font-bold">
+                                  <span className="truncate">{item.sender}</span>
+                                  <span
+                                    className={
+                                      isSelected
+                                        ? "text-amber-200"
+                                        : "text-slate-500"
+                                    }
+                                  >
+                                    {item.time}
+                                  </span>
+                                </div>
+                                <div
+                                  className={`text-[10px] truncate mt-0.5 ${
+                                    isSelected ? "text-slate-100 font-bold" : "text-slate-700"
+                                  }`}
+                                >
+                                  {item.subject}
+                                </div>
+                              </button>
+                            );
+                          })
+                        )}
                       </div>
                     </div>
 
                     {/* Right: Email Detail View & Send Message Box */}
                     <div className="flex-1 bg-white border border-[#7f9db9] rounded p-3 flex flex-col overflow-hidden">
-                      {/* Email Header */}
-                      <div className="border-b border-[#7f9db9] pb-2 mb-2">
-                        <div className="flex items-center justify-between">
-                          <h4 className="font-pixel text-xs text-[#0055ea] font-bold">
-                            {selectedEmail.subject}
-                          </h4>
-                          <span className="text-[10px] text-slate-500 font-bold">
-                            Received: {selectedEmail.time}
-                          </span>
-                        </div>
-                        <div className="text-[11px] text-slate-700 mt-1 font-bold">
-                          From:{" "}
-                          <span className="text-[#0055ea]">
-                            {selectedEmail.sender}
-                          </span>{" "}
-                          ({selectedEmail.role})
-                        </div>
-                      </div>
+                      {selectedEmail ? (
+                        <>
+                          {/* Email Header */}
+                          <div className="border-b border-[#7f9db9] pb-2 mb-2">
+                            <div className="flex items-center justify-between">
+                              <h4 className="font-pixel text-xs text-[#0055ea] font-bold">
+                                {selectedEmail.subject}
+                              </h4>
+                              <span className="text-[10px] text-slate-500 font-bold">
+                                Received: {selectedEmail.time}
+                              </span>
+                            </div>
+                            <div className="text-[11px] text-slate-700 mt-1 font-bold flex flex-wrap justify-between gap-1">
+                              <div>
+                                From:{" "}
+                                <span className="text-[#0055ea]">
+                                  {selectedEmail.sender}
+                                </span>{" "}
+                                ({selectedEmail.senderEmail || selectedEmail.role})
+                              </div>
+                              <div>
+                                To:{" "}
+                                <span className="text-[#0055ea]">
+                                  {selectedEmail.receiver}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
 
-                      {/* Reading Pane */}
-                      <div className="flex-1 bg-[#fdfdfd] border border-[#eee] p-3 rounded text-xs text-slate-800 font-mono whitespace-pre-line leading-relaxed overflow-y-auto mb-3 shadow-inner">
-                        {selectedEmail.body}
-                      </div>
+                          {/* Reading Pane */}
+                          <div className="flex-1 bg-[#fdfdfd] border border-[#eee] p-3 rounded text-xs text-slate-800 font-mono whitespace-pre-line leading-relaxed overflow-y-auto mb-3 shadow-inner">
+                            {selectedEmail.body}
+                            {selectedEmail.attachments && selectedEmail.attachments.length > 0 && (
+                              <div className="mt-3 pt-2 border-t border-slate-200 text-[10px] text-slate-600 font-bold flex items-center gap-1.5">
+                                <Paperclip className="size-3 text-[#0055ea]" />
+                                <span>Attachments:</span>
+                                <span className="text-[#0055ea] font-mono">
+                                  {selectedEmail.attachments.join(", ")}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                        </>
+                      ) : (
+                        <div className="flex-1 bg-[#fdfdfd] border border-[#eee] p-6 rounded text-xs text-slate-400 font-mono flex flex-col items-center justify-center text-center mb-3">
+                          <Mail className="size-10 text-slate-300 mb-2" />
+                          <p className="font-pixel text-xs text-slate-600 font-bold">NO THREAD SELECTED</p>
+                          <p className="text-[10px] text-slate-400 mt-1 max-w-xs">
+                            Type an agent's email in the compose box below to start a new email thread!
+                          </p>
+                        </div>
+                      )}
 
                       {/* Notification Toast */}
                       {sentNotification && (
@@ -366,31 +477,69 @@ export default function MichaelScottOSModal({
                         </div>
                       )}
 
-                      {/* Compose Email / Reply to Agent Form */}
+                      {/* Compose Email Form with Agent Email Autocomplete */}
                       <form
                         onSubmit={handleSendEmail}
-                        className="bg-[#f0f4f9] border border-[#7f9db9] p-2.5 rounded space-y-2"
+                        className="bg-[#f0f4f9] border border-[#7f9db9] p-2.5 rounded space-y-2 relative"
                       >
-                        <div className="flex items-center gap-2 text-xs">
-                          <span className="font-bold text-slate-700 font-pixel">
-                            To Agent:
+                        <div className="flex items-center gap-2 text-xs relative">
+                          <span className="font-bold text-slate-700 font-pixel shrink-0">
+                            To (Agent Email):
                           </span>
-                          <select
-                            value={selectedEmailAgent}
-                            onChange={(e) =>
-                              setSelectedEmailAgent(e.target.value)
-                            }
-                            className="bg-white border border-[#7f9db9] px-2 py-1 rounded text-xs text-slate-900 font-bold"
-                          >
-                            {agents.map((a) => (
-                              <option key={a.id} value={a.id}>
-                                {a.name} ({a.officeRole.split(" ")[0]})
-                              </option>
-                            ))}
-                            <option value="all">
-                              BROADCAST TO ALL AGENTS 📢
-                            </option>
-                          </select>
+
+                          <div className="relative flex-1">
+                            <input
+                              type="text"
+                              value={recipientEmail}
+                              onFocus={() => setShowSuggestions(true)}
+                              onChange={(e) => {
+                                setRecipientEmail(e.target.value);
+                                setShowSuggestions(true);
+                              }}
+                              placeholder="Type agent email (e.g. dwight.schrute@dundermifflin.com)..."
+                              className="w-full bg-white border border-[#7f9db9] px-2 py-1 text-xs rounded text-slate-900 placeholder:text-slate-400 focus:outline-none font-mono"
+                            />
+
+                            {/* Auto-complete suggestions dropdown */}
+                            {showSuggestions && suggestions.length > 0 && (
+                              <div className="absolute left-0 right-0 bottom-full mb-1 bg-white border-2 border-[#0055ea] rounded shadow-2xl z-50 max-h-48 overflow-y-auto">
+                                <div className="px-2 py-1 bg-[#ece9d8] border-b text-[10px] font-pixel text-[#0055ea] font-bold">
+                                  AGENT EMAIL SUGGESTIONS ({suggestions.length})
+                                </div>
+                                {suggestions.map((agent) => (
+                                  <button
+                                    type="button"
+                                    key={agent.id}
+                                    onMouseDown={() => {
+                                      setRecipientEmail(agent.email || `${agent.id}@dundermifflin.com`);
+                                      setSelectedAgentId(agent.id);
+                                      setShowSuggestions(false);
+                                    }}
+                                    className="w-full text-left px-2 py-1.5 hover:bg-[#316ac5] hover:text-white text-xs border-b border-slate-100 flex items-center justify-between cursor-pointer transition-colors"
+                                  >
+                                    <div>
+                                      <span className="font-bold">{agent.name}</span>{" "}
+                                      <span className="text-[10px] opacity-80">&lt;{agent.email}&gt;</span>
+                                    </div>
+                                    <span className="text-[9px] opacity-70 font-mono">{agent.officeRole.split(" ")[0]}</span>
+                                  </button>
+                                ))}
+
+                                <button
+                                  type="button"
+                                  onMouseDown={() => {
+                                    setRecipientEmail("all.agents@dundermifflin.com");
+                                    setSelectedAgentId("all");
+                                    setShowSuggestions(false);
+                                  }}
+                                  className="w-full text-left px-2 py-1.5 bg-amber-50 hover:bg-amber-500 hover:text-white text-xs font-bold text-amber-800 flex items-center justify-between cursor-pointer transition-colors"
+                                >
+                                  <span>📢 BROADCAST TO ALL AGENTS</span>
+                                  <span className="text-[9px] font-mono">&lt;all.agents@dundermifflin.com&gt;</span>
+                                </button>
+                              </div>
+                            )}
+                          </div>
                         </div>
 
                         <input
@@ -401,17 +550,25 @@ export default function MichaelScottOSModal({
                           className="w-full bg-white border border-[#7f9db9] px-2 py-1 text-xs rounded text-slate-900 placeholder:text-slate-400 focus:outline-none"
                         />
 
+                        <input
+                          type="text"
+                          value={emailAttachments}
+                          onChange={(e) => setEmailAttachments(e.target.value)}
+                          placeholder="Attachments (comma separated files/links, e.g. spec.pdf, mockup.png)"
+                          className="w-full bg-white border border-[#7f9db9] px-2 py-1 text-xs rounded text-slate-900 placeholder:text-slate-400 focus:outline-none"
+                        />
+
                         <div className="flex items-center gap-2">
                           <textarea
                             value={emailBody}
                             onChange={(e) => setEmailBody(e.target.value)}
-                            placeholder={`Write instruction email to ${selectedEmail?.sender}...`}
+                            placeholder="Write instruction email body..."
                             rows={2}
                             className="flex-1 bg-white border border-[#7f9db9] p-2 text-xs rounded text-slate-900 placeholder:text-slate-400 focus:outline-none resize-none"
                           />
                           <button
                             type="submit"
-                            disabled={!emailBody.trim()}
+                            disabled={!emailBody.trim() || !recipientEmail.trim()}
                             className="bg-[#0055ea] hover:bg-[#0047bf] text-white font-pixel text-xs px-4 py-3 rounded border border-[#003da6] shadow cursor-pointer font-bold disabled:opacity-50 flex items-center gap-1 shrink-0"
                           >
                             <Send className="size-3.5" />
@@ -474,7 +631,8 @@ export default function MichaelScottOSModal({
                               onClick={() => {
                                 playRetroSound("click");
                                 setActiveApp("email");
-                                setSelectedEmailAgent(agent.id);
+                                setRecipientEmail(agent.email || `${agent.id}@dundermifflin.com`);
+                                setSelectedAgentId(agent.id);
                               }}
                               className="bg-[#0055ea] hover:bg-[#0047bf] text-white font-pixel text-[10px] px-3 py-1.5 rounded border border-[#003da6] cursor-pointer font-bold shadow"
                             >

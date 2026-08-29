@@ -1,8 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { INITIAL_AGENTS } from "@/lib/officeAgents";
+import { api } from "@/lib/api";
+import { authClient } from "@/lib/auth-client";
 import TopHeaderBar from "@/components/office/TopHeaderBar";
 import OfficeFloorMap from "@/components/office/OfficeFloorMap";
 import RightAgentPanel from "@/components/office/RightAgentPanel";
@@ -14,12 +17,70 @@ import MichaelScottOSModal from "@/components/office/MichaelScottOSModal";
 import { playRetroSound } from "@/lib/retroAudio";
 
 export default function DedicatedOfficeApp() {
+  const router = useRouter();
+  const [checkingUser, setCheckingUser] = useState(true);
   const [agents, setAgents] = useState(INITIAL_AGENTS);
   const [selectedAgent, setSelectedAgent] = useState(null); // Unlocked on page load
   const [isMemoryOpen, setIsMemoryOpen] = useState(false);
   const [isConferenceOpen, setIsConferenceOpen] = useState(false);
   const [isDundiesOpen, setIsDundiesOpen] = useState(false);
   const [isMichaelOSOpen, setIsMichaelOSOpen] = useState(false);
+
+  // Verify Better Auth user session and hit /api/user to check user details status
+  useEffect(() => {
+    async function verifyUserSessionAndDetails() {
+      try {
+        let hasActiveSession = false;
+
+        // 1. Verify user session via Better Auth client
+        try {
+          const sessionRes = await authClient.getSession();
+          if (sessionRes?.data?.user || sessionRes?.data?.session) {
+            hasActiveSession = true;
+          }
+        } catch (authErr) {
+          console.warn("Better Auth session check warning:", authErr);
+        }
+
+        // Check local user fallback if session check offline
+        const userJson = typeof window !== "undefined" ? localStorage.getItem("founder_user") : null;
+        if (!hasActiveSession && !userJson) {
+          toast.error("Authentication required. Please sign in.");
+          router.replace("/login");
+          return;
+        }
+
+        // 2. Hit /api/user to check if user has entered onboarding details
+        const res = await api.get("/api/user/status");
+        if (res && res.exists === false) {
+          router.replace("/onboarding");
+          return;
+        }
+      } catch (err) {
+        console.error("Error hitting /api/user or verifying session:", err);
+        const userJson = typeof window !== "undefined" ? localStorage.getItem("founder_user") : null;
+        if (!userJson) {
+          router.replace("/login");
+          return;
+        }
+        try {
+          const user = JSON.parse(userJson);
+          const userOnboardedKey = `founder_onboarded_${user.email}`;
+          const onboarded = localStorage.getItem(userOnboardedKey) || localStorage.getItem("founder_onboarded");
+          if (onboarded === "false") {
+            router.replace("/onboarding");
+            return;
+          }
+        } catch (e) {
+          console.error(e);
+        }
+      } finally {
+        setCheckingUser(false);
+      }
+    }
+
+    verifyUserSessionAndDetails();
+  }, [router]);
 
   // Handle agent selection & trigger Michael Scott Executive XP OS modal
   const handleSelectAgent = (agent) => {
@@ -103,6 +164,19 @@ export default function DedicatedOfficeApp() {
       dundieScore: (agent?.dundieScore || 0) + 50
     });
   };
+
+  if (checkingUser) {
+    return (
+      <div className="flex h-screen w-screen items-center justify-center bg-[#fdf6e3] text-[#073642] font-mono select-none">
+        <div className="flex flex-col items-center gap-3">
+          <div className="size-10 rounded-full border-4 border-[#b58900]/30 border-t-[#cb4b16] animate-spin" />
+          <p className="font-pixel text-xs text-[#073642] font-bold tracking-wider">
+            VERIFYING FOUNDER DETAILS VIA /api/user...
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col h-screen w-screen bg-[#fdf6e3] text-[#073642] font-mono overflow-hidden select-none">

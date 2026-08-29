@@ -17,7 +17,11 @@ using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using Avalonia.Platform;
 using Avalonia.Threading;
-using Microsoft.Playwright;
+
+// NOTE: Microsoft.Playwright is no longer used here. The browser is now owned
+// entirely by the `playwright-cli` process (npm package @playwright/cli), which
+// keeps a persistent background session alive between individual CLI invocations.
+// This class becomes a relay: WebSocket in <-> shell out to playwright-cli <-> WebSocket out.
 
 namespace foundersharness
 {
@@ -28,15 +32,18 @@ namespace foundersharness
         private CancellationTokenSource? _serverCts;
         private const int Port = 9000;
 
-        // Playwright variables
-        private IPlaywright? _playwright;
-        private IBrowser? _browser;
-        private IBrowserContext? _browserContext;
-        private IPage? _activePage;
+        // playwright-cli session state (replaces IPlaywright / IBrowser / IBrowserContext / IPage)
+        private bool _browserOpen = false;
+        private string _activeSessionName = "";
+
+        // VERIFY: confirm the actual binary name on PATH after `npm install -g @playwright/cli`.
+        // Docs/examples consistently show `playwright-cli`, but check `where playwright-cli` (Windows)
+        // after install to be sure npm's global bin dir is on PATH.
+        private const string CliExecutable = "playwright-cli";
 
         // Flags
         private bool _isExiting = false;
-        private bool _isInstallingPlaywright = false;
+        private bool _isInstallingCli = false;
 
         // Tray Icon
         private TrayIcon? _trayIcon;
@@ -53,7 +60,7 @@ namespace foundersharness
 
             // Log startup
             Log("foundersharness Dev Helper started.");
-            
+
             // Automatically start the WebSocket server on load
             _ = StartWebSocketServerAsync();
 
@@ -72,7 +79,7 @@ namespace foundersharness
                 };
 
                 var menu = new NativeMenu();
-                
+
                 var showItem = new NativeMenuItem("Show Logs / Control Panel");
                 showItem.Click += (s, e) => ShowWindow();
                 menu.Add(showItem);
@@ -129,7 +136,7 @@ namespace foundersharness
                     18,
                     new SolidColorBrush(Color.Parse("#edeae2"))
                 );
-                
+
                 // Draw text centered
                 ctx.DrawText(formattedText, new Point(9, 4));
             }
@@ -199,9 +206,9 @@ namespace foundersharness
 
                 if (lblBrowserStatus != null && elBrowserStatus != null && btnToggleBrowser != null)
                 {
-                    if (_browser != null || _browserContext != null)
+                    if (_browserOpen)
                     {
-                        lblBrowserStatus.Text = "Browser: Running";
+                        lblBrowserStatus.Text = $"Browser: Running ({_activeSessionName})";
                         elBrowserStatus.Fill = new SolidColorBrush(Color.Parse("#4a6b4e"));
                         btnToggleBrowser.Content = "Close Browser";
                     }
@@ -249,12 +256,6 @@ namespace foundersharness
                 await StopWebSocketServerAsync();
                 await CloseBrowserAsync();
 
-                if (_playwright != null)
-                {
-                    _playwright.Dispose();
-                    _playwright = null;
-                }
-
                 Dispatcher.UIThread.Post(() =>
                 {
                     if (_trayIcon != null)
@@ -266,7 +267,7 @@ namespace foundersharness
                         }
                         _trayIcon.Dispose();
                     }
-                    
+
                     if (Application.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
                     {
                         desktop.Shutdown();
@@ -334,7 +335,7 @@ namespace foundersharness
 
             Log("Stopping WebSocket Server...");
             _serverCts?.Cancel();
-            
+
             try
             {
                 _httpListener.Stop();
@@ -410,8 +411,8 @@ namespace foundersharness
                     if (result.MessageType == WebSocketMessageType.Text)
                     {
                         string messageJson = Encoding.UTF8.GetString(buffer, 0, result.Count);
-                        string responseJson = await ProcessPlaywrightCommandAsync(messageJson);
-                        
+                        string responseJson = await ProcessCliCommandAsync(messageJson);
+
                         byte[] responseBytes = Encoding.UTF8.GetBytes(responseJson);
                         await webSocket.SendAsync(new ArraySegment<byte>(responseBytes), WebSocketMessageType.Text, true, cancellationToken);
                     }
@@ -430,17 +431,128 @@ namespace foundersharness
 
         #endregion
 
-        #region Playwright Browser Operations
+        #region playwright-cli process runner
+
+        private class CliResult
+        {
+            public bool Success;
+            public string StdOut = "";
+            public string StdErr = "";
+            public int ExitCode;
+        }
+
+        /// <summary>
+        /// Runs `playwright-cli {arguments}` as a subprocess and captures output.
+        /// Each call is a fresh OS process; playwright-cli itself is responsible for
+        /// keeping the actual browser alive across calls via its background daemon session.
+        /// </summary>
+        private async Task<CliResult> RunCliAsync(string arguments, int timeoutMs = 30000)
+        {
+            ProcessStartInfo psi;
+            if (OperatingSystem.IsWindows())
+            {
+                psi = new ProcessStartInfo
+                {
+                    FileName = "cmd.exe",
+                    Arguments = $"/c {CliExecutable} {arguments}",
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                };
+            }
+            else
+            {
+                psi = new ProcessStartInfo
+                {
+                    FileName = CliExecutable,
+                    Arguments = arguments,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                };
+            }
+
+            Log($"[playwright-cli] {arguments}");
+
+            using var process = new Process { StartInfo = psi };
+            var stdOut = new StringBuilder();
+            var stdErr = new StringBuilder();
+
+            process.OutputDataReceived += (s, e) => { if (e.Data != null) stdOut.AppendLine(e.Data); };
+            process.ErrorDataReceived += (s, e) => { if (e.Data != null) stdErr.AppendLine(e.Data); };
+
+            try
+            {
+                process.Start();
+                process.BeginOutputReadLine();
+                process.BeginErrorReadLine();
+
+                using var cts = new CancellationTokenSource(timeoutMs);
+                try
+                {
+                    await process.WaitForExitAsync(cts.Token);
+                }
+                catch (OperationCanceledException)
+                {
+                    try { process.Kill(entireProcessTree: true); } catch { /* best effort */ }
+                    return new CliResult { Success = false, StdErr = $"Command timed out after {timeoutMs}ms: {arguments}" };
+                }
+
+                return new CliResult
+                {
+                    Success = process.ExitCode == 0,
+                    StdOut = stdOut.ToString(),
+                    StdErr = stdErr.ToString(),
+                    ExitCode = process.ExitCode
+                };
+            }
+            catch (Exception ex)
+            {
+                return new CliResult { Success = false, StdErr = $"Failed to start playwright-cli: {ex.Message}" };
+            }
+        }
+
+        /// <summary>
+        /// Confirmed syntax per playwright-cli docs: the session flag is a GLOBAL flag that
+        /// precedes the subcommand, e.g. `playwright-cli -s=myproj open https://example.com`.
+        /// Empty/"default" session name omits the flag and uses the CLI's own default session.
+        /// </summary>
+        private static string SessionPrefix(string sessionName) =>
+            string.IsNullOrEmpty(sessionName) || sessionName == "default" ? "" : $"-s=\"{sessionName}\" ";
+
+        /// <summary>
+        /// Builds and runs `playwright-cli [-s=session] {command}` in one place so every
+        /// call site gets consistent session scoping.
+        /// </summary>
+        private Task<CliResult> RunCliCommandAsync(string sessionName, string command, int timeoutMs = 30000) =>
+            RunCliAsync($"{SessionPrefix(sessionName)}{command}", timeoutMs);
+
+        /// <summary>
+        /// Per-session output directory for snapshot/screenshot files, so concurrent sessions
+        /// never collide and we always know the exact path without parsing CLI stdout.
+        /// </summary>
+        private static string GetSessionOutputDir(string sessionName)
+        {
+            string dir = Path.Combine(Path.GetTempPath(), "foundersharness-cli", string.IsNullOrEmpty(sessionName) ? "default" : sessionName);
+            Directory.CreateDirectory(dir);
+            return dir;
+        }
+
+        #endregion
+
+        #region Browser (playwright-cli session) Operations
 
         private async void OnToggleBrowserClick(object sender, RoutedEventArgs e)
         {
-            if (_browser != null || _browserContext != null)
+            if (_browserOpen)
             {
                 await CloseBrowserAsync();
             }
             else
             {
-                bool installed = await CheckAndInstallPlaywrightAsync(autoInstall: true);
+                bool installed = await CheckAndInstallCliAsync(autoInstall: true);
                 if (installed)
                 {
                     await EnsureBrowserOpenAsync();
@@ -448,20 +560,9 @@ namespace foundersharness
             }
         }
 
-        private string _activeSessionName = "";
-
-        private void BrowserContext_Closed(object? sender, IBrowserContext e)
+        private async Task<bool> EnsureBrowserOpenAsync(string sessionName = "default")
         {
-            Log($"Browser persistent session '{_activeSessionName}' was closed.");
-            _browser = null;
-            _browserContext = null;
-            _activePage = null;
-            UpdateUIStates();
-        }
-
-        private async Task EnsureBrowserOpenAsync(string sessionName = "default")
-        {
-            if (_browser != null || _browserContext != null)
+            if (_browserOpen)
             {
                 if (_activeSessionName != sessionName)
                 {
@@ -470,113 +571,61 @@ namespace foundersharness
                 }
                 else
                 {
-                    return;
+                    return true;
                 }
             }
 
             _activeSessionName = sessionName;
 
-            try
+            Log($"Opening playwright-cli session '{sessionName}'...");
+
+            // Confirmed: open is HEADLESS by default. --headed shows the window (we want that,
+            // since this is a desktop app where visibility matters for debugging/trust).
+            // --persistent saves the profile to disk so login state survives app restarts.
+            var result = await RunCliCommandAsync(sessionName, "open --persistent --headed", timeoutMs: 60000);
+
+            if (!result.Success)
             {
-                Log("Starting Playwright driver...");
-                if (_playwright == null)
+                Log($"Failed to open browser session: {result.StdErr}");
+
+                if (result.StdErr.Contains("browser", StringComparison.OrdinalIgnoreCase) &&
+                    (result.StdErr.Contains("not found", StringComparison.OrdinalIgnoreCase) ||
+                     result.StdErr.Contains("install", StringComparison.OrdinalIgnoreCase)))
                 {
-                    _playwright = await Playwright.CreateAsync();
-                }
-
-                if (!string.IsNullOrEmpty(sessionName))
-                {
-                    string profilePath = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "browser_profiles", sessionName);
-                    Log($"Launching Chromium with persistent session '{sessionName}' at: {profilePath}...");
-                    
-                    _browserContext = await _playwright.Chromium.LaunchPersistentContextAsync(profilePath, new BrowserTypeLaunchPersistentContextOptions
-                    {
-                        Headless = false,
-                        Args = new[] { "--no-sandbox", "--disable-setuid-sandbox" },
-                        ViewportSize = new ViewportSize { Width = 1280, Height = 720 }
-                    });
-
-                    _browserContext.Close += BrowserContext_Closed;
-                    _activePage = _browserContext.Pages.Count > 0 ? _browserContext.Pages[0] : await _browserContext.NewPageAsync();
-                }
-                else
-                {
-                    Log("Launching Chromium browser (ephemeral mode)...");
-                    _browser = await _playwright.Chromium.LaunchAsync(new BrowserTypeLaunchOptions
-                    {
-                        Headless = false,
-                        Args = new[] { "--no-sandbox", "--disable-setuid-sandbox" }
-                    });
-
-                    _browser.Disconnected += Browser_Disconnected;
-
-                    _browserContext = await _browser.NewContextAsync(new BrowserNewContextOptions
-                    {
-                        ViewportSize = new ViewportSize { Width = 1280, Height = 720 }
-                    });
-
-                    _activePage = await _browserContext.NewPageAsync();
-                }
-
-                Log("Browser ready.");
-                UpdateUIStates();
-            }
-            catch (Exception ex)
-            {
-                Log($"Failed to launch browser: {ex.Message}");
-                if (ex.Message.Contains("Executable doesn't exist") || ex.Message.Contains("playwright") || ex.Message.Contains("executable"))
-                {
-                    Log("Attempting automatic recovery/installation of Playwright browsers...");
-                    bool success = await CheckAndInstallPlaywrightAsync(autoInstall: true);
+                    Log("Attempting automatic recovery/installation of playwright-cli browser binaries...");
+                    bool success = await CheckAndInstallCliAsync(autoInstall: true);
                     if (success)
                     {
-                        Log("Playwright installation complete. Retrying browser launch...");
-                        await EnsureBrowserOpenAsync(sessionName);
-                        return;
+                        Log("Installation complete. Retrying browser open...");
+                        return await EnsureBrowserOpenAsync(sessionName);
                     }
                 }
-                _browser = null;
-                _browserContext = null;
-                _activePage = null;
-                UpdateUIStates();
-            }
-        }
 
-        private void Browser_Disconnected(object? sender, IBrowser e)
-        {
-            Log("Browser window was closed.");
-            _browser = null;
-            _browserContext = null;
-            _activePage = null;
+                _browserOpen = false;
+                UpdateUIStates();
+                return false;
+            }
+
+            _browserOpen = true;
+            Log("Browser ready.");
             UpdateUIStates();
+            return true;
         }
 
         private async Task CloseBrowserAsync()
         {
-            if (_browser == null && _browserContext == null) return;
+            if (!_browserOpen) return;
 
             Log("Closing browser...");
-            try
+
+            // Confirmed core command: `close` closes the page/browser for the given session.
+            var result = await RunCliCommandAsync(_activeSessionName, "close");
+            if (!result.Success)
             {
-                if (_browser != null)
-                {
-                    _browser.Disconnected -= Browser_Disconnected;
-                    await _browser.CloseAsync();
-                }
-                else if (_browserContext != null)
-                {
-                    _browserContext.Close -= BrowserContext_Closed;
-                    await _browserContext.CloseAsync();
-                }
-            }
-            catch (Exception ex)
-            {
-                Log($"Error closing browser: {ex.Message}");
+                Log($"Error closing browser: {result.StdErr}");
             }
 
-            _browser = null;
-            _browserContext = null;
-            _activePage = null;
+            _browserOpen = false;
             Log("Browser closed.");
             UpdateUIStates();
         }
@@ -585,7 +634,7 @@ namespace foundersharness
 
         #region Command Processing
 
-        private async Task<string> ProcessPlaywrightCommandAsync(string requestJson)
+        private async Task<string> ProcessCliCommandAsync(string requestJson)
         {
             string id = "unknown";
             try
@@ -606,16 +655,19 @@ namespace foundersharness
                 string action = actionProp.GetString() ?? "";
                 Log($"Executing agent action: {action}");
 
-                string sessionName = "";
+                string sessionName = "default";
                 if (root.TryGetProperty("sessionName", out var sessionNameProp))
                 {
-                    sessionName = sessionNameProp.GetString() ?? "";
+                    string? sn = sessionNameProp.GetString();
+                    if (!string.IsNullOrEmpty(sn)) sessionName = sn;
                 }
 
                 if (action == "launch")
                 {
-                    await EnsureBrowserOpenAsync(sessionName);
-                    return CreateResponseJson(id, "success", "Browser launched successfully.");
+                    bool ok = await EnsureBrowserOpenAsync(sessionName);
+                    return ok
+                        ? CreateResponseJson(id, "success", "Browser launched successfully.")
+                        : CreateResponseJson(id, "error", null, "Failed to launch browser via playwright-cli.");
                 }
                 else if (action == "close")
                 {
@@ -623,322 +675,293 @@ namespace foundersharness
                     return CreateResponseJson(id, "success", "Browser closed successfully.");
                 }
 
-                await EnsureBrowserOpenAsync(sessionName);
-                if (_activePage == null)
+                bool opened = await EnsureBrowserOpenAsync(sessionName);
+                if (!opened)
                 {
-                    return CreateResponseJson(id, "error", null, "Browser initialized but active page is unavailable.");
+                    return CreateResponseJson(id, "error", null, "Browser could not be initialized.");
                 }
+
+                string outputDir = GetSessionOutputDir(sessionName);
 
                 switch (action.ToLower())
                 {
                     case "snapshot":
                     {
-                        string snapshotScript = @"
-                            (() => {
-                                document.querySelectorAll('[data-agent-ref]').forEach(el => el.removeAttribute('data-agent-ref'));
-                                const selectors = 'a, button, input, textarea, select, [role], [onclick], [tabindex]';
-                                const nodes = Array.from(document.querySelectorAll(selectors));
-                                const results = [];
-                                const stack = []; // ancestor stack of { el, ref } for currently-open containers
-                                let i = 0;
+                        // Confirmed: `snapshot --filename=f` saves to a specific path, so we don't
+                        // need to parse the auto-generated "[Snapshot](...)" link at all.
+                        string snapshotPath = Path.Combine(outputDir, $"snapshot-{Guid.NewGuid():N}.yaml");
+                        string cmd = $"snapshot --filename=\"{snapshotPath}\"";
 
-                                for (const el of nodes) {
-                                    const rect = el.getBoundingClientRect();
-                                    if (rect.width === 0 || rect.height === 0) continue;
-                                    const style = window.getComputedStyle(el);
-                                    if (style.visibility === 'hidden' || style.display === 'none') continue;
+                        // Optional depth limit for efficiency, mirroring `snapshot --depth=N`.
+                        if (root.TryGetProperty("depth", out var depthProp) && depthProp.TryGetInt32(out int depth))
+                            cmd += $" --depth={depth}";
 
-                                    // Pop any ancestors on the stack that don't actually contain this element
-                                    while (stack.length && !stack[stack.length - 1].el.contains(el)) {
-                                        stack.pop();
-                                    }
+                        // Optional: snapshot a specific element instead of the whole page
+                        // (`snapshot <ref>` / `snapshot "#selector"`).
+                        if (root.TryGetProperty("ref", out var snapRefProp))
+                            cmd += $" {snapRefProp.GetString()}";
 
-                                    const ref = 'r' + (i++);
-                                    el.setAttribute('data-agent-ref', ref);
+                        var result = await RunCliCommandAsync(sessionName, cmd);
+                        if (!result.Success)
+                            return CreateResponseJson(id, "error", null, $"snapshot failed: {result.StdErr}");
 
-                                    const role = el.getAttribute('role') || el.tagName.toLowerCase();
-                                    const aria = el.getAttribute('aria-label');
-                                    const alt = el.getAttribute('alt');
-                                    const placeholder = el.getAttribute('placeholder');
-                                    const value = el.value;
-                                    // Full text content, NOT hard-capped at a tiny length. Cap generously
-                                    // just to avoid pathological multi-KB nodes, with a visible marker if cut.
-                                    let fullText = (el.innerText || '').trim();
-                                    if (fullText.length > 2000) fullText = fullText.slice(0, 2000) + ' …[truncated]';
-                                    const name = (aria || fullText || alt || placeholder || value || '').trim();
-
-                                    const parentRef = stack.length ? stack[stack.length - 1].ref : null;
-                                    const depth = stack.length;
-
-                                    results.push({ ref, tag: el.tagName.toLowerCase(), role, name, parentRef, depth });
-
-                                    stack.push({ el, ref });
-                                }
-
-                                return JSON.stringify(results);
-                            })()
-                        ";
-                        var snapshotJson = await _activePage.EvaluateAsync<string>(snapshotScript);
-                        return CreateResponseJson(id, "success", snapshotJson);
+                        try
+                        {
+                            string yamlContent = await File.ReadAllTextAsync(snapshotPath);
+                            return CreateResponseJson(id, "success", yamlContent);
+                        }
+                        catch (Exception ex)
+                        {
+                            return CreateResponseJson(id, "error", null, $"Snapshot file could not be read at '{snapshotPath}': {ex.Message}");
+                        }
                     }
 
                     case "click_ref":
                     {
                         if (!root.TryGetProperty("ref", out var refProp))
                             return CreateResponseJson(id, "error", null, "Missing 'ref' parameter for click_ref action.");
-                        string refSel = $"[data-agent-ref=\"{refProp.GetString()}\"]";
-                        try
-                        {
-                            await _activePage.ClickAsync(refSel, new PageClickOptions { Timeout = 3000 });
-                            return CreateResponseJson(id, "success", $"Clicked ref {refProp.GetString()}");
-                        }
-                        catch (Exception ex)
-                        {
-                            try
-                            {
-                                await _activePage.Locator(refSel).First.EvaluateAsync("el => el.click()");
-                                return CreateResponseJson(id, "success", $"Clicked ref {refProp.GetString()} (JS fallback)");
-                            }
-                            catch (Exception jsEx)
-                            {
-                                return CreateResponseJson(id, "error", null, $"click_ref failed: {ex.Message} / JS fallback: {jsEx.Message}");
-                            }
-                        }
+                        string refId = refProp.GetString() ?? "";
+                        var result = await RunCliCommandAsync(sessionName, $"click {refId}");
+                        return result.Success
+                            ? CreateResponseJson(id, "success", $"Clicked ref {refId}")
+                            : CreateResponseJson(id, "error", null, $"click_ref failed: {result.StdErr}");
+                    }
+
+                    case "dblclick_ref":
+                    {
+                        if (!root.TryGetProperty("ref", out var refProp))
+                            return CreateResponseJson(id, "error", null, "Missing 'ref' parameter for dblclick_ref action.");
+                        string refId = refProp.GetString() ?? "";
+                        var result = await RunCliCommandAsync(sessionName, $"dblclick {refId}");
+                        return result.Success
+                            ? CreateResponseJson(id, "success", $"Double-clicked ref {refId}")
+                            : CreateResponseJson(id, "error", null, $"dblclick_ref failed: {result.StdErr}");
                     }
 
                     case "fill_ref":
                     {
                         if (!root.TryGetProperty("ref", out var fillRefProp) || !root.TryGetProperty("text", out var fillTextProp))
                             return CreateResponseJson(id, "error", null, "Missing 'ref' or 'text' parameter for fill_ref action.");
-                        string fillRefSel = $"[data-agent-ref=\"{fillRefProp.GetString()}\"]";
-                        try
-                        {
-                            await _activePage.FillAsync(fillRefSel, fillTextProp.GetString() ?? "");
-                            return CreateResponseJson(id, "success", $"Filled ref {fillRefProp.GetString()}");
-                        }
-                        catch (Exception ex)
-                        {
-                            return CreateResponseJson(id, "error", null, $"fill_ref failed: {ex.Message}");
-                        }
+                        string fillRef = fillRefProp.GetString() ?? "";
+                        string fillText = fillTextProp.GetString() ?? "";
+                        string escapedText = fillText.Replace("\"", "\\\"");
+
+                        // Optional: `fill <ref> <text> --submit` presses Enter afterwards.
+                        bool submit = root.TryGetProperty("submit", out var submitProp) && submitProp.GetBoolean();
+                        string cmd = $"fill {fillRef} \"{escapedText}\"" + (submit ? " --submit" : "");
+
+                        var result = await RunCliCommandAsync(sessionName, cmd);
+                        return result.Success
+                            ? CreateResponseJson(id, "success", $"Filled ref {fillRef}")
+                            : CreateResponseJson(id, "error", null, $"fill_ref failed: {result.StdErr}");
                     }
+
+                    case "select_ref":
+                    {
+                        if (!root.TryGetProperty("ref", out var selRefProp) || !root.TryGetProperty("value", out var selValProp))
+                            return CreateResponseJson(id, "error", null, "Missing 'ref' or 'value' parameter for select_ref action.");
+                        string selRef = selRefProp.GetString() ?? "";
+                        string selVal = (selValProp.GetString() ?? "").Replace("\"", "\\\"");
+                        var result = await RunCliCommandAsync(sessionName, $"select {selRef} \"{selVal}\"");
+                        return result.Success
+                            ? CreateResponseJson(id, "success", $"Selected '{selVal}' on ref {selRef}")
+                            : CreateResponseJson(id, "error", null, $"select_ref failed: {result.StdErr}");
+                    }
+
+                    case "check_ref":
+                    case "uncheck_ref":
+                    {
+                        if (!root.TryGetProperty("ref", out var checkRefProp))
+                            return CreateResponseJson(id, "error", null, $"Missing 'ref' parameter for {action} action.");
+                        string checkRef = checkRefProp.GetString() ?? "";
+                        string cliCmd = action.ToLower() == "check_ref" ? "check" : "uncheck";
+                        var result = await RunCliCommandAsync(sessionName, $"{cliCmd} {checkRef}");
+                        return result.Success
+                            ? CreateResponseJson(id, "success", $"{cliCmd} ref {checkRef}")
+                            : CreateResponseJson(id, "error", null, $"{action} failed: {result.StdErr}");
+                    }
+
+                    case "hover_ref":
+                    {
+                        if (!root.TryGetProperty("ref", out var hoverRefProp))
+                            return CreateResponseJson(id, "error", null, "Missing 'ref' parameter for hover_ref action.");
+                        string hoverRef = hoverRefProp.GetString() ?? "";
+                        var result = await RunCliCommandAsync(sessionName, $"hover {hoverRef}");
+                        return result.Success
+                            ? CreateResponseJson(id, "success", $"Hovered ref {hoverRef}")
+                            : CreateResponseJson(id, "error", null, $"hover_ref failed: {result.StdErr}");
+                    }
+
                     case "navigate":
+                    {
                         if (!root.TryGetProperty("url", out var urlProp))
                             return CreateResponseJson(id, "error", null, "Missing 'url' parameter for navigate action.");
                         string url = urlProp.GetString() ?? "";
-                        Log($"Navigating to: {url}");
-                        await _activePage.GotoAsync(url);
-                        return CreateResponseJson(id, "success", $"Navigated to {url}");
+                        var result = await RunCliCommandAsync(sessionName, $"goto \"{url}\"");
+                        return result.Success
+                            ? CreateResponseJson(id, "success", $"Navigated to {url}")
+                            : CreateResponseJson(id, "error", null, $"navigate failed: {result.StdErr}");
+                    }
 
-                    case "click":
-                        if (!root.TryGetProperty("selector", out var clickSelProp))
-                            return CreateResponseJson(id, "error", null, "Missing 'selector' parameter for click action.");
-                        string clickSel = clickSelProp.GetString() ?? "";
-                        
-                        bool force = false;
-                        if (root.TryGetProperty("force", out var forceProp))
-                            force = forceProp.GetBoolean();
-
-                        var selectorFallbacks = GetSelectorCandidates(clickSel);
-
-                        bool clickedSuccessfully = false;
-                        Exception? lastClickException = null;
-
-                        foreach (var targetSel in selectorFallbacks)
+                    case "go_back":
+                    case "go_forward":
+                    case "reload":
+                    {
+                        string navCmd = action.ToLower() switch
                         {
-                            try
-                            {
-                                var locator = _activePage.Locator(targetSel);
-                                var count = await locator.CountAsync();
-                                if (count == 0)
-                                {
-                                    try
-                                    {
-                                        await locator.First.WaitForAsync(new LocatorWaitForOptions { State = WaitForSelectorState.Attached, Timeout = 1000 });
-                                        count = await locator.CountAsync();
-                                    }
-                                    catch
-                                    {
-                                        continue;
-                                    }
-                                }
-
-                                if (count == 0) continue;
-
-                                Log($"Clicking {targetSel}");
-                                // First attempt: Playwright standard click with short timeout
-                                await _activePage.ClickAsync(targetSel, new PageClickOptions { Force = force, Timeout = 2000 });
-                                Log($"Successfully clicked selector via Playwright: {targetSel}");
-                                clickedSuccessfully = true;
-                                break;
-                            }
-                            catch (Exception ex)
-                            {
-                                lastClickException = ex;
-                                // Fallback: JavaScript direct click (bypasses interceptability and actionability checks)
-                                try
-                                {
-                                    Log($"Clicking {targetSel} (JS Fallback)");
-                                    await _activePage.Locator(targetSel).First.EvaluateAsync("el => (el as HTMLElement).click()");
-                                    Log($"Successfully clicked selector via JS Fallback: {targetSel}");
-                                    clickedSuccessfully = true;
-                                    break;
-                                }
-                                catch (Exception jsEx)
-                                {
-                                    lastClickException = new Exception($"Playwright click failed for {targetSel}: {ex.Message}. JS click failed: {jsEx.Message}");
-                                }
-                            }
-                        }
-
-                        // If no candidates matched via CountAsync/WaitForAsync, do one final Playwright Click attempt on the original selector
-                        if (!clickedSuccessfully && lastClickException == null)
-                        {
-                            try
-                            {
-                                Log($"Clicking primary selector directly: {clickSel}");
-                                await _activePage.ClickAsync(clickSel, new PageClickOptions { Force = force, Timeout = 2500 });
-                                clickedSuccessfully = true;
-                            }
-                            catch (Exception ex)
-                            {
-                                lastClickException = new Exception($"Element '{clickSel}' not found on page (Searched candidates: {string.Join(", ", selectorFallbacks)}). Error: {ex.Message}");
-                            }
-                        }
-
-                        if (!clickedSuccessfully)
-                        {
-                            string errMsg = lastClickException?.Message ?? $"Element '{clickSel}' was not found in the DOM.";
-                            return CreateResponseJson(id, "error", null, $"Click failed for selector variants of '{clickSel}'. Last error: {errMsg}");
-                        }
-                        return CreateResponseJson(id, "success", $"Clicked selector {clickSel}");
-
-                    case "fill":
-                        if (!root.TryGetProperty("selector", out var fillSelProp) || !root.TryGetProperty("text", out var textProp))
-                            return CreateResponseJson(id, "error", null, "Missing 'selector' or 'text' parameter for fill action.");
-                        string fillSel = fillSelProp.GetString() ?? "";
-                        string text = textProp.GetString() ?? "";
-                        
-                        bool filled = false;
-                        Exception? fillEx = null;
-                        foreach (var targetSel in GetSelectorCandidates(fillSel))
-                        {
-                            try
-                            {
-                                if (await _activePage.Locator(targetSel).CountAsync() > 0)
-                                {
-                                    await _activePage.FillAsync(targetSel, text);
-                                    filled = true;
-                                    break;
-                                }
-                            }
-                            catch (Exception ex) { fillEx = ex; }
-                        }
-                        if (!filled)
-                        {
-                            return CreateResponseJson(id, "error", null, $"Fill failed for selector {fillSel}: {fillEx?.Message}");
-                        }
-                        return CreateResponseJson(id, "success", $"Filled {fillSel} with text");
+                            "go_back" => "go-back",
+                            "go_forward" => "go-forward",
+                            _ => "reload"
+                        };
+                        var result = await RunCliCommandAsync(sessionName, navCmd);
+                        return result.Success
+                            ? CreateResponseJson(id, "success", navCmd)
+                            : CreateResponseJson(id, "error", null, $"{navCmd} failed: {result.StdErr}");
+                    }
 
                     case "press":
-                        if (!root.TryGetProperty("selector", out var pressSelProp) || !root.TryGetProperty("key", out var keyProp))
-                            return CreateResponseJson(id, "error", null, "Missing 'selector' or 'key' parameter for press action.");
-                        string pressSel = pressSelProp.GetString() ?? "";
+                    {
+                        // Confirmed: `press <key>` acts on whatever element currently has focus
+                        // (e.g. right after a `fill`/`click`), not on an arbitrary ref. If a 'ref'
+                        // is supplied we click it first purely to move focus there.
+                        if (!root.TryGetProperty("key", out var keyProp))
+                            return CreateResponseJson(id, "error", null, "Missing 'key' parameter for press action.");
                         string key = keyProp.GetString() ?? "";
-                        
-                        bool pressed = false;
-                        Exception? pressEx = null;
-                        foreach (var targetSel in GetSelectorCandidates(pressSel))
+
+                        if (root.TryGetProperty("ref", out var pressRefProp))
                         {
-                            try
-                            {
-                                if (await _activePage.Locator(targetSel).CountAsync() > 0)
-                                {
-                                    await _activePage.PressAsync(targetSel, key);
-                                    pressed = true;
-                                    break;
-                                }
-                            }
-                            catch (Exception ex) { pressEx = ex; }
+                            string pressRef = pressRefProp.GetString() ?? "";
+                            var clickResult = await RunCliCommandAsync(sessionName, $"click {pressRef}");
+                            if (!clickResult.Success)
+                                return CreateResponseJson(id, "error", null, $"press failed to focus ref {pressRef}: {clickResult.StdErr}");
                         }
-                        if (!pressed)
-                        {
-                            return CreateResponseJson(id, "error", null, $"Press failed for selector {pressSel}: {pressEx?.Message}");
-                        }
-                        return CreateResponseJson(id, "success", $"Pressed {key} on {pressSel}");
+
+                        var result = await RunCliCommandAsync(sessionName, $"press {key}");
+                        return result.Success
+                            ? CreateResponseJson(id, "success", $"Pressed {key}")
+                            : CreateResponseJson(id, "error", null, $"press failed: {result.StdErr}");
+                    }
+
+                    case "type":
+                    {
+                        // `type <text>` types into whatever element currently has focus.
+                        if (!root.TryGetProperty("text", out var typeTextProp))
+                            return CreateResponseJson(id, "error", null, "Missing 'text' parameter for type action.");
+                        string typeText = (typeTextProp.GetString() ?? "").Replace("\"", "\\\"");
+                        var result = await RunCliCommandAsync(sessionName, $"type \"{typeText}\"");
+                        return result.Success
+                            ? CreateResponseJson(id, "success", "Typed text")
+                            : CreateResponseJson(id, "error", null, $"type failed: {result.StdErr}");
+                    }
 
                     case "screenshot":
-                        var screenshotBytes = await _activePage.ScreenshotAsync(new PageScreenshotOptions { Type = ScreenshotType.Png });
-                        string base64Screenshot = Convert.ToBase64String(screenshotBytes);
-                        return CreateResponseJson(id, "success", base64Screenshot);
+                    {
+                        // Confirmed: `screenshot [ref] --filename=f` saves a PNG to a specific path.
+                        string screenshotPath = Path.Combine(outputDir, $"screenshot-{Guid.NewGuid():N}.png");
+                        string cmd = $"screenshot --filename=\"{screenshotPath}\"";
+                        if (root.TryGetProperty("ref", out var shotRefProp))
+                            cmd = $"screenshot {shotRefProp.GetString()} --filename=\"{screenshotPath}\"";
 
-                    case "content":
-                        string snapshot = await _activePage.AriaSnapshotAsync();
-                        return CreateResponseJson(id, "success", snapshot);
+                        var result = await RunCliCommandAsync(sessionName, cmd);
+                        if (!result.Success)
+                            return CreateResponseJson(id, "error", null, $"screenshot failed: {result.StdErr}");
+
+                        try
+                        {
+                            byte[] bytes = await File.ReadAllBytesAsync(screenshotPath);
+                            return CreateResponseJson(id, "success", Convert.ToBase64String(bytes));
+                        }
+                        catch (Exception ex)
+                        {
+                            return CreateResponseJson(id, "error", null, $"Screenshot file could not be read at '{screenshotPath}': {ex.Message}");
+                        }
+                    }
+
+                    case "dialog_accept":
+                    {
+                        string cmd = "dialog-accept";
+                        if (root.TryGetProperty("promptText", out var promptProp))
+                            cmd += $" \"{(promptProp.GetString() ?? "").Replace("\"", "\\\"")}\"";
+                        var result = await RunCliCommandAsync(sessionName, cmd);
+                        return result.Success
+                            ? CreateResponseJson(id, "success", "Dialog accepted")
+                            : CreateResponseJson(id, "error", null, $"dialog_accept failed: {result.StdErr}");
+                    }
+
+                    case "dialog_dismiss":
+                    {
+                        var result = await RunCliCommandAsync(sessionName, "dialog-dismiss");
+                        return result.Success
+                            ? CreateResponseJson(id, "success", "Dialog dismissed")
+                            : CreateResponseJson(id, "error", null, $"dialog_dismiss failed: {result.StdErr}");
+                    }
+
+                    case "eval_ref":
+                    case "evaluate":
+                    {
+                        // Confirmed: `eval <func> [ref]` runs a JS function against the page,
+                        // or against a specific element when a ref is given.
+                        if (!root.TryGetProperty("script", out var scriptProp))
+                            return CreateResponseJson(id, "error", null, $"Missing 'script' parameter for {action} action.");
+                        string script = scriptProp.GetString() ?? "";
+                        string cmd = $"eval \"{script.Replace("\"", "\\\"")}\"";
+                        if (root.TryGetProperty("ref", out var evalRefProp))
+                            cmd += $" {evalRefProp.GetString()}";
+
+                        var result = await RunCliCommandAsync(sessionName, cmd);
+                        return result.Success
+                            ? CreateResponseJson(id, "success", result.StdOut.Trim())
+                            : CreateResponseJson(id, "error", null, $"{action} failed: {result.StdErr}");
+                    }
 
                     case "get_text":
-                        if (!root.TryGetProperty("selector", out var textSelProp))
-                            return CreateResponseJson(id, "error", null, "Missing 'selector' parameter for get_text action.");
-                        string textSel = textSelProp.GetString() ?? "";
-                        string txtVal = "";
-                        foreach (var targetSel in GetSelectorCandidates(textSel))
-                        {
-                            try
-                            {
-                                if (await _activePage.Locator(targetSel).CountAsync() > 0)
-                                {
-                                    txtVal = await _activePage.TextContentAsync(targetSel) ?? "";
-                                    break;
-                                }
-                            }
-                            catch { }
-                        }
-                        return CreateResponseJson(id, "success", txtVal);
-
                     case "get_value":
-                        if (!root.TryGetProperty("selector", out var valSelProp))
-                            return CreateResponseJson(id, "error", null, "Missing 'selector' parameter for get_value action.");
-                        string valSel = valSelProp.GetString() ?? "";
-                        string val = "";
-                        foreach (var targetSel in GetSelectorCandidates(valSel))
-                        {
-                            try
-                            {
-                                if (await _activePage.Locator(targetSel).CountAsync() > 0)
-                                {
-                                    val = await _activePage.InputValueAsync(targetSel) ?? "";
-                                    break;
-                                }
-                            }
-                            catch { }
-                        }
-                        return CreateResponseJson(id, "success", val);
+                    {
+                        // No dedicated CLI command for these; implemented via `eval` against a ref.
+                        if (!root.TryGetProperty("ref", out var getRefProp))
+                            return CreateResponseJson(id, "error", null, $"Missing 'ref' parameter for {action} action.");
+                        string getRef = getRefProp.GetString() ?? "";
+                        string jsExpr = action.ToLower() == "get_text"
+                            ? "el => el.textContent ?? ''"
+                            : "el => el.value ?? ''";
+                        var result = await RunCliCommandAsync(sessionName, $"eval \"{jsExpr}\" {getRef}");
+                        return result.Success
+                            ? CreateResponseJson(id, "success", result.StdOut.Trim())
+                            : CreateResponseJson(id, "error", null, $"{action} failed: {result.StdErr}");
+                    }
 
                     case "new_page":
-                        if (_browserContext == null)
-                            return CreateResponseJson(id, "error", null, "No browser context active.");
-                        _activePage = await _browserContext.NewPageAsync();
-                        return CreateResponseJson(id, "success", "Opened new tab");
+                    {
+                        string? url = root.TryGetProperty("url", out var newPageUrlProp) ? newPageUrlProp.GetString() : null;
+                        string cmd = "tab-new" + (string.IsNullOrEmpty(url) ? "" : $" \"{url}\"");
+                        var result = await RunCliCommandAsync(sessionName, cmd);
+                        return result.Success
+                            ? CreateResponseJson(id, "success", "Opened new tab")
+                            : CreateResponseJson(id, "error", null, $"new_page failed: {result.StdErr}");
+                    }
 
                     case "close_page":
-                        if (_activePage != null)
-                        {
-                            await _activePage.CloseAsync();
-                        }
-                        _activePage = _browserContext?.Pages.LastOrDefault();
-                        return CreateResponseJson(id, "success", "Closed tab");
+                    {
+                        string? tabIdx = root.TryGetProperty("index", out var idxProp) ? idxProp.GetRawText() : null;
+                        string cmd = "tab-close" + (tabIdx == null ? "" : $" {tabIdx}");
+                        var result = await RunCliCommandAsync(sessionName, cmd);
+                        return result.Success
+                            ? CreateResponseJson(id, "success", "Closed tab")
+                            : CreateResponseJson(id, "error", null, $"close_page failed: {result.StdErr}");
+                    }
 
                     case "active_pages":
-                        if (_browserContext == null)
-                            return CreateResponseJson(id, "success", new string[] { });
-                        var urls = _browserContext.Pages.Select(p => p.Url).ToArray();
-                        return CreateResponseJson(id, "success", urls);
+                    {
+                        var result = await RunCliCommandAsync(sessionName, "tab-list");
+                        return result.Success
+                            ? CreateResponseJson(id, "success", result.StdOut.Trim())
+                            : CreateResponseJson(id, "error", null, $"active_pages failed: {result.StdErr}");
+                    }
 
-                    case "evaluate":
-                        if (!root.TryGetProperty("script", out var scriptProp))
-                            return CreateResponseJson(id, "error", null, "Missing 'script' parameter for evaluate action.");
-                        string script = scriptProp.GetString() ?? "";
-                        var evalRes = await _activePage.EvaluateAsync<System.Text.Json.JsonElement>(script);
-                        return CreateResponseJson(id, "success", evalRes.ToString());
+                    case "content":
+                        // Superseded by 'snapshot' — no separate ARIA-only command in playwright-cli.
+                        return CreateResponseJson(id, "error", null,
+                            "Action 'content' is superseded by 'snapshot' under playwright-cli.");
 
                     default:
                         return CreateResponseJson(id, "error", null, $"Unknown action: '{action}'");
@@ -969,16 +992,16 @@ namespace foundersharness
 
         private async Task RunAutoSetupAsync()
         {
-            Log("Checking Playwright browser availability...");
-            bool isReady = await VerifyPlaywrightReadyAsync();
+            Log("Checking playwright-cli availability...");
+            bool isReady = await VerifyCliReadyAsync();
             if (isReady)
             {
-                Log("Playwright browser engines verified and ready.");
+                Log("playwright-cli detected and verified.");
             }
             else
             {
-                Log("Expected Playwright browser engines are missing or out of date.");
-                
+                Log("playwright-cli is missing or not fully set up.");
+
                 var txtInstallLogs = this.FindControl<TextBox>("TxtInstallLogs");
                 var pnlInstaller = this.FindControl<Grid>("PnlInstaller");
 
@@ -990,8 +1013,8 @@ namespace foundersharness
                     if (pnlInstaller != null) pnlInstaller.IsVisible = true;
                 });
 
-                bool success = await CheckAndInstallPlaywrightAsync(autoInstall: true, logBoxOverride: txtInstallLogs);
-                
+                bool success = await CheckAndInstallCliAsync(autoInstall: true, logBoxOverride: txtInstallLogs);
+
                 if (success)
                 {
                     Dispatcher.UIThread.Post(() =>
@@ -1029,14 +1052,12 @@ namespace foundersharness
             }
         }
 
-        private async Task<bool> VerifyPlaywrightReadyAsync()
+        private async Task<bool> VerifyCliReadyAsync()
         {
             try
             {
-                using var playwright = await Playwright.CreateAsync();
-                var testBrowser = await playwright.Chromium.LaunchAsync(new BrowserTypeLaunchOptions { Headless = true });
-                await testBrowser.CloseAsync();
-                return true;
+                var versionResult = await RunCliAsync("--version", timeoutMs: 10000);
+                return versionResult.Success;
             }
             catch
             {
@@ -1047,12 +1068,12 @@ namespace foundersharness
         private async void OnInstallPlaywrightClick(object sender, RoutedEventArgs e)
         {
             var txtLogs = this.FindControl<TextBox>("TxtLogs");
-            await CheckAndInstallPlaywrightAsync(autoInstall: true, logBoxOverride: txtLogs);
+            await CheckAndInstallCliAsync(autoInstall: true, logBoxOverride: txtLogs);
         }
 
-        private async Task<bool> CheckAndInstallPlaywrightAsync(bool autoInstall, TextBox? logBoxOverride = null)
+        private async Task<bool> CheckAndInstallCliAsync(bool autoInstall, TextBox? logBoxOverride = null)
         {
-            if (_isInstallingPlaywright) return false;
+            if (_isInstallingCli) return false;
 
             Action<string> logAction = (msg) =>
             {
@@ -1066,204 +1087,125 @@ namespace foundersharness
                 }
             };
 
-            string playwrightCachePath = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), 
-                "ms-playwright"
-            );
-
-            bool browsersExist = Directory.Exists(playwrightCachePath) && Directory.GetDirectories(playwrightCachePath).Length > 0;
-
-            if (browsersExist && !autoInstall)
+            bool alreadyInstalled = await VerifyCliReadyAsync();
+            if (alreadyInstalled && !autoInstall)
             {
-                logAction("Playwright browser files detected in ms-playwright cache folder.");
+                logAction("playwright-cli detected and browsers already installed.");
                 return true;
             }
 
-            _isInstallingPlaywright = true;
+            _isInstallingCli = true;
             Dispatcher.UIThread.Post(() =>
             {
-                var btnInstallPlaywright = this.FindControl<Button>("BtnInstallPlaywright");
-                if (btnInstallPlaywright != null)
+                var btnInstallCli = this.FindControl<Button>("BtnInstallPlaywright");
+                if (btnInstallCli != null)
                 {
-                    btnInstallPlaywright.IsEnabled = false;
-                    btnInstallPlaywright.Content = "Installing...";
+                    btnInstallCli.IsEnabled = false;
+                    btnInstallCli.Content = "Installing...";
                 }
             });
 
-            logAction("Starting Playwright browser installation (Chromium, Firefox, Webkit)...");
+            logAction("Installing @playwright/cli globally via npm...");
             logAction("This may take 1-3 minutes depending on your internet connection.");
 
-            bool success = await Task.Run(() =>
+            bool success = await Task.Run(async () =>
             {
                 try
                 {
-                    string scriptPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "playwright.ps1");
-                    if (!File.Exists(scriptPath))
-                    {
-                        logAction($"Error: Installer script 'playwright.ps1' not found in: {AppDomain.CurrentDomain.BaseDirectory}");
+                    // Step 1: install the npm package globally.
+                    if (!await RunNpmStepAsync("install -g @playwright/cli@latest", logAction))
                         return false;
-                    }
 
-                    logAction($"Found installer script at {scriptPath}");
-                    logAction("Executing PowerShell process to run the Playwright installer script...");
+                    // Step 2: install browser binaries.
+                    // VERIFY: confirm 'install-browser' is the correct subcommand name/flags.
+                    if (!await RunShellStepAsync(CliExecutable, "install-browser", logAction))
+                        return false;
 
-                    ProcessStartInfo psi = new ProcessStartInfo
-                    {
-                        FileName = "powershell.exe",
-                        Arguments = $"-ExecutionPolicy Bypass -File \"{scriptPath}\" install",
-                        RedirectStandardOutput = true,
-                        RedirectStandardError = true,
-                        UseShellExecute = false,
-                        CreateNoWindow = true
-                    };
+                    // Step 3 (optional): install agent skills for IDE-integrated coding agents.
+                    // Not required for our own WebSocket-based backend agent, but harmless to run
+                    // in case the same machine is also used with Claude Code / Copilot directly.
+                    await RunShellStepAsync(CliExecutable, "install --skills", logAction);
 
-                    using Process process = new Process { StartInfo = psi };
-                    process.OutputDataReceived += (s, ev) => { if (ev.Data != null) logAction($"[Playwright Installer] {ev.Data}"); };
-                    process.ErrorDataReceived += (s, ev) => { if (ev.Data != null) logAction($"[Playwright Error] {ev.Data}"); };
-
-                    process.Start();
-                    process.BeginOutputReadLine();
-                    process.BeginErrorReadLine();
-                    process.WaitForExit();
-
-                    logAction($"Playwright installer exited with code {process.ExitCode}");
-                    return process.ExitCode == 0;
+                    return true;
                 }
                 catch (Exception ex)
                 {
-                    logAction($"Exception during Playwright installation: {ex.Message}");
+                    logAction($"Exception during playwright-cli installation: {ex.Message}");
                     return false;
                 }
             });
 
-            _isInstallingPlaywright = false;
+            _isInstallingCli = false;
             Dispatcher.UIThread.Post(() =>
             {
-                var btnInstallPlaywright = this.FindControl<Button>("BtnInstallPlaywright");
-                if (btnInstallPlaywright != null)
+                var btnInstallCli = this.FindControl<Button>("BtnInstallPlaywright");
+                if (btnInstallCli != null)
                 {
-                    btnInstallPlaywright.IsEnabled = true;
-                    btnInstallPlaywright.Content = "Install Playwright";
+                    btnInstallCli.IsEnabled = true;
+                    btnInstallCli.Content = "Install Playwright CLI";
                 }
             });
 
             if (success)
             {
-                logAction("Playwright browsers installed successfully!");
+                logAction("playwright-cli installed successfully!");
             }
             else
             {
-                logAction("Playwright installation failed. See logs above for details.");
+                logAction("playwright-cli installation failed. See logs above for details.");
             }
 
             return success;
         }
 
-        private static List<string> GetSelectorCandidates(string rawSelector)
+        private static bool RunShellStepSync(string fileName, string arguments, Action<string> logAction)
         {
-            var candidates = new List<string>();
-            if (string.IsNullOrWhiteSpace(rawSelector)) return candidates;
+            logAction($"Running: {fileName} {arguments}");
 
-            string trimmed = rawSelector.Trim();
-
-            // 1. Check if rawSelector is in ARIA snapshot format: e.g. 'link "leeglin_india\'s profile picture"'
-            var ariaMatch = System.Text.RegularExpressions.Regex.Match(
-                trimmed,
-                @"^(link|button|heading|textbox|img|checkbox|radio|combobox|tab|menuitem|option|dialog|region|group|article|listitem)\s+[""](.*)[""]$",
-                System.Text.RegularExpressions.RegexOptions.IgnoreCase
-            );
-
-            if (!ariaMatch.Success)
+            ProcessStartInfo psi;
+            if (OperatingSystem.IsWindows())
             {
-                ariaMatch = System.Text.RegularExpressions.Regex.Match(
-                    trimmed,
-                    @"^(link|button|heading|textbox|img|checkbox|radio|combobox|tab|menuitem|option|dialog|region|group|article|listitem)\s+['](.*)[']$",
-                    System.Text.RegularExpressions.RegexOptions.IgnoreCase
-                );
+                psi = new ProcessStartInfo
+                {
+                    FileName = "cmd.exe",
+                    Arguments = $"/c {fileName} {arguments}",
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                };
+            }
+            else
+            {
+                psi = new ProcessStartInfo
+                {
+                    FileName = fileName,
+                    Arguments = arguments,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                };
             }
 
-            if (ariaMatch.Success)
-            {
-                string role = ariaMatch.Groups[1].Value.ToLower();
-                string name = ariaMatch.Groups[2].Value;
+            using var process = new Process { StartInfo = psi };
+            process.OutputDataReceived += (s, ev) => { if (ev.Data != null) logAction($"[{fileName}] {ev.Data}"); };
+            process.ErrorDataReceived += (s, ev) => { if (ev.Data != null) logAction($"[{fileName} err] {ev.Data}"); };
 
-                string escapedDouble = name.Replace("\"", "\\\"");
+            process.Start();
+            process.BeginOutputReadLine();
+            process.BeginErrorReadLine();
+            process.WaitForExit();
 
-                candidates.Add($"role={role}[name=\"{escapedDouble}\"]");
-                candidates.Add($"internal:role={role}[name=\"{escapedDouble}\"]");
-                candidates.Add($"text=\"{escapedDouble}\"");
-                candidates.Add($":has-text(\"{escapedDouble}\")");
-
-                if (role == "link")
-                {
-                    candidates.Add($"a:has-text(\"{escapedDouble}\")");
-                    candidates.Add($"a[aria-label=\"{escapedDouble}\"]");
-                    candidates.Add($"a[alt=\"{escapedDouble}\"]");
-                    candidates.Add($"img[alt=\"{escapedDouble}\"]");
-                }
-                else if (role == "button")
-                {
-                    candidates.Add($"button:has-text(\"{escapedDouble}\")");
-                    candidates.Add($"button[aria-label=\"{escapedDouble}\"]");
-                    candidates.Add($"input[type=\"button\"][value=\"{escapedDouble}\"]");
-                    candidates.Add($"input[type=\"submit\"][value=\"{escapedDouble}\"]");
-                }
-                else if (role == "textbox")
-                {
-                    candidates.Add($"input[placeholder=\"{escapedDouble}\"]");
-                    candidates.Add($"input[aria-label=\"{escapedDouble}\"]");
-                    candidates.Add($"textarea[placeholder=\"{escapedDouble}\"]");
-                }
-                else if (role == "img")
-                {
-                    candidates.Add($"img[alt=\"{escapedDouble}\"]");
-                    candidates.Add($"img[aria-label=\"{escapedDouble}\"]");
-                }
-
-                candidates.Add($"[aria-label=\"{escapedDouble}\"]");
-                candidates.Add($"[alt=\"{escapedDouble}\"]");
-                candidates.Add($"[title=\"{escapedDouble}\"]");
-
-                return candidates;
-            }
-
-            // 2. Already Playwright engine selector
-            if (trimmed.StartsWith("role=") || trimmed.StartsWith("text=") || trimmed.StartsWith("xpath=") || trimmed.StartsWith("internal:"))
-            {
-                candidates.Add(trimmed);
-                return candidates;
-            }
-
-            // 3. CSS Selector
-            candidates.Add(trimmed);
-
-            // Tag name replacement fallback
-            var match = System.Text.RegularExpressions.Regex.Match(trimmed, @"^([a-zA-Z0-9\-]+)(\[.*\])$");
-            if (match.Success)
-            {
-                var originalTag = match.Groups[1].Value;
-                var attributes = match.Groups[2].Value;
-                var fallbackTags = new[] { "div", "span", "a", "svg", "button", "*" };
-                foreach (var tag in fallbackTags)
-                {
-                    if (tag != originalTag)
-                    {
-                        candidates.Add(tag + attributes);
-                    }
-                }
-            }
-
-            // Child element fallbacks ONLY for simple CSS selectors without quotes or spaces
-            if (!trimmed.Contains("\"") && !trimmed.Contains("'") && !trimmed.Contains(" "))
-            {
-                candidates.Add(trimmed + " svg");
-                candidates.Add(trimmed + " span");
-                candidates.Add(trimmed + " div");
-                candidates.Add(trimmed + " a");
-            }
-
-            return candidates;
+            logAction($"{fileName} exited with code {process.ExitCode}");
+            return process.ExitCode == 0;
         }
+
+        private static Task<bool> RunShellStepAsync(string fileName, string arguments, Action<string> logAction) =>
+            Task.Run(() => RunShellStepSync(fileName, arguments, logAction));
+
+        private static Task<bool> RunNpmStepAsync(string npmArguments, Action<string> logAction) =>
+            RunShellStepAsync("npm", npmArguments, logAction);
 
         #endregion
     }

@@ -1,66 +1,6 @@
 import { Agent } from './agent.interface';
 import type { LeanCanvasOutput } from './schema';
 
-export const ProductStrategyAgent: Agent = {
-  id: 'product-strategy',
-  name: 'Product Strategy Agent',
-  role: 'Expert Product Strategist & Startup Advisor',
-  systemPrompt: `You are an elite Startup Product Strategist. Your goal is to analyze startup ideas, define a clear MVP scope, highlight product-market fit opportunities, and outline a step-by-step product roadmap. 
-Be highly structured, practical, and clear. Avoid generic advice. Use bullet points and action items.`,
-  generatePrompt(answers: any) {
-    return `Analyze the following startup context:
-- Product idea: ${answers[1] || 'Not specified'}
-- Ideal Customer Profile (ICP): ${answers[2] || 'Not specified'}
-- Startup Stage: ${answers[3] || 'Not specified'}
-- 90-Day Priorities: ${answers[4] || 'Not specified'}
-- Current bottlenecks: ${answers[5] || 'Not specified'}
-
-Provide:
-1. MVP Scope refinement: What core features should be built first?
-2. Product Roadblock mitigations: How to bypass the bottlenecks mentioned.
-3. 90-Day Roadmap milestones.`;
-  },
-};
-
-export const MarketingContentAgent: Agent = {
-  id: 'marketing-content',
-  name: 'Marketing & Content Agent',
-  role: 'Growth Hacker & Brand Strategist',
-  systemPrompt: `You are a high-growth startup CMO. Your task is to craft a customer acquisition strategy, design early marketing channels, define brand voice, and write initial messaging hooks for the target audience.
-Keep recommendations laser-focused on low-budget, high-leverage growth strategies.`,
-  generatePrompt(answers: any) {
-    return `Analyze this startup details:
-- Startup Idea: ${answers[1] || 'Not specified'}
-- Target Customers: ${answers[2] || 'Not specified'}
-- Launch stage: ${answers[3] || 'Not specified'}
-
-Provide:
-1. Ideal Customer Profile (ICP) segmentation.
-2. 3 actionable, low-cost marketing channels to acquire the first 100 users.
-3. A high-converting messaging hook / value proposition headline.`;
-  },
-};
-
-export const OperationsAgent: Agent = {
-  id: 'operations',
-  name: 'Operations & Automation Agent',
-  role: 'Lean Operations Specialist & Automation Engineer',
-  systemPrompt: `You are a startup Operations Specialist. Your job is to identify manual bottlenecks, propose custom automation workflows, and outline tool stack recommendations to save the founders 10+ hours a week.
-Provide concrete ideas using tools like Make.com, Zapier, and standard APIs.`,
-  generatePrompt(answers: any) {
-    return `Analyze this startup operations profile:
-- Team setup: ${answers[6] || 'Not specified'}
-- Current tools stack: ${answers[7] ? answers[7].join(', ') : 'Not specified'}
-- Repetitive work to automate: ${answers[8] || 'Not specified'}
-- Roadmap bottlenecks: ${answers[5] || 'Not specified'}
-
-Provide:
-1. Specific automation blueprints (e.g. "When X happens in Notion, trigger Y in Slack").
-2. Team collaboration guidelines for their async / hybrid setup.
-3. Tool stack recommendations to optimize speed.`;
-  },
-};
-
 export const LeanCanvasAgent: Agent = {
   id: 'lean-canvas',
   name: 'Lean Canvas Agent',
@@ -169,65 +109,171 @@ Extract all structured facts, entities, relationships, and chronological events 
   }
 };
 
-export const SocialMediaAgent: Agent = {
-  id: 'social-media',
-  name: 'Social Media Agent',
-  role: 'Expert Social Media Automation Agent',
-  systemPrompt: `You are an automated social media session verification and content posting agent.
-Your primary task is to control a browser to inspect page states (using URL and accessibility-tree elements) and perform social media actions.
+import { AGENT_PERSONALITIES } from './agent-personalities';
 
-When verifying a session, your goal is to determine if the user is already logged in or if they are on a login screen.
-You must return a JSON object conforming to the following structure:
-{
-  "thought": "brief reasoning explaining what you observe",
-  "action": "navigate" | "click" | "wait" | "finish",
-  "url": "optional URL to navigate to (if action is navigate)",
-  "selector": "valid Playwright/CSS selector to click, e.g. 'a[href*=\"...\"]', 'role=link[name=\"...\"]', or 'button:has-text(\"...\")' (if action is click)",
-  "ms": 2000,
-  "connected": true | false,
-  "confidence": "high" | "medium" | "low",
-  "username": "profile name or handle if visible, or null"
-}
+// ============================================================================
+// AGENT FLEET: EMAIL & TASK PROMPTS FOR ALL FLEET AGENTS (COPYRIGHT-SAFE)
+// ============================================================================
 
-Example A (logged in):
-Signals: URL matches feed or home page, elements contain personalized items.
-[{role: "link", name: "Messages"}, {role: "img", name: "Profile photo"}, {role: "button", name: "Home"}]
-Response: {"thought": "I see navigation links to Messages and Home, and a Profile photo. This indicates a logged-in session.", "action": "finish", "connected": true, "confidence": "high", "username": "Startup Founder"}
+export const MarcusScottAgent: Agent = {
+  id: AGENT_PERSONALITIES['marcus-scott'].id,
+  name: AGENT_PERSONALITIES['marcus-scott'].name,
+  role: AGENT_PERSONALITIES['marcus-scott'].title,
+  systemPrompt: AGENT_PERSONALITIES['marcus-scott'].systemPromptTemplate,
+  generatePrompt(canvasData: LeanCanvasOutput | any) {
+    const rawCanvasJson = typeof canvasData === 'string' ? canvasData : JSON.stringify(canvasData, null, 2);
+    return `${this.systemPrompt}
 
-Example B (logged out):
-Signals: URL redirects to login or shows sign-in forms.
-[{role: "input-text", name: "Phone number, username, or email"}, {role: "input-password", name: "Password"}, {role: "button", name: "Log in"}]
-Response: {"thought": "I see login form elements for username, password, and log in button. The user is logged out.", "action": "finish", "connected": false, "confidence": "high", "username": null}
+Here is the founder's raw Lean Canvas JSON file:
+\`\`\`json
+${rawCanvasJson}
+\`\`\`
 
-Example C (ambiguous / loading):
-Signals: Page is blank or shows loading headers.
-[{role: "heading", name: "Loading..."}]
-Response: {"thought": "The page is still loading, I should wait for a moment.", "action": "wait", "ms": 3000}`,
-
-  generatePrompt(answers: any) {
-    const platform = answers.platform || 'unknown';
-    const platformHint = answers.platformHint || 'No hints available.';
-    return `You are verifying the session for platform: "${platform}".
-Injected Hint: "${platformHint}"
-
-Inspect the active URL and the accessibility element tree, and output your next action as a valid JSON object.`;
+Analyze the raw Lean Canvas file above. Generate a warm introductory email from ${this.name} (${AGENT_PERSONALITIES['marcus-scott'].email}) greeting the founder, stating your role as ${this.role}, and explaining what you can do for them based on their raw Lean Canvas data. Signature Quirk: "${AGENT_PERSONALITIES['marcus-scott'].signatureQuirk}".`;
   },
 };
 
+export const PamelaMillerAgent: Agent = {
+  id: AGENT_PERSONALITIES['pamela-miller'].id,
+  name: AGENT_PERSONALITIES['pamela-miller'].name,
+  role: AGENT_PERSONALITIES['pamela-miller'].title,
+  systemPrompt: AGENT_PERSONALITIES['pamela-miller'].systemPromptTemplate,
+  generatePrompt(canvasData: LeanCanvasOutput | any) {
+    const rawCanvasJson = typeof canvasData === 'string' ? canvasData : JSON.stringify(canvasData, null, 2);
+    return `${this.systemPrompt}
 
+Here is the founder's raw Lean Canvas JSON file:
+\`\`\`json
+${rawCanvasJson}
+\`\`\`
 
-export const AGENT_MAP: Record<string, Agent> = {
-  'Product Strategy': ProductStrategyAgent,
-  'Marketing & Content': MarketingContentAgent,
-  Operations: OperationsAgent,
-  'Lean Canvas': LeanCanvasAgent,
-  'Social Media': SocialMediaAgent,
+Analyze the raw Lean Canvas file above (problem, solution, unique value proposition, customer segments). Generate an introductory email from ${this.name} (${AGENT_PERSONALITIES['pamela-miller'].email}) greeting the founder, stating your role as ${this.role}, and explaining how you design 7-day social story content and post banners based on their raw Lean Canvas.`;
+  },
 };
 
-export const getAgentById = (id: string): Agent | undefined => {
-  return (
-    Object.values(AGENT_MAP).find(
-      (agent) => agent.id === id || agent.name === id,
-    ) || AGENT_MAP[id]
-  );
+export const JimmyHarperAgent: Agent = {
+  id: AGENT_PERSONALITIES['jimmy-harper'].id,
+  name: AGENT_PERSONALITIES['jimmy-harper'].name,
+  role: AGENT_PERSONALITIES['jimmy-harper'].title,
+  systemPrompt: AGENT_PERSONALITIES['jimmy-harper'].systemPromptTemplate,
+  generatePrompt(canvasData: LeanCanvasOutput | any) {
+    const rawCanvasJson = typeof canvasData === 'string' ? canvasData : JSON.stringify(canvasData, null, 2);
+    return `${this.systemPrompt}
+
+Here is the founder's raw Lean Canvas JSON file:
+\`\`\`json
+${rawCanvasJson}
+\`\`\`
+
+Analyze the raw Lean Canvas file above (channels, customer segments). Generate an introductory email from ${this.name} (${AGENT_PERSONALITIES['jimmy-harper'].email}) greeting the founder, stating your role as ${this.role}, and explaining how you execute headless Playwright CDP browser sessions on port 9222 to post updates with zero API keys required.`;
+  },
 };
+
+export const DerrickVanceAgent: Agent = {
+  id: AGENT_PERSONALITIES['derrick-vance'].id,
+  name: AGENT_PERSONALITIES['derrick-vance'].name,
+  role: AGENT_PERSONALITIES['derrick-vance'].title,
+  systemPrompt: AGENT_PERSONALITIES['derrick-vance'].systemPromptTemplate,
+  generatePrompt(canvasData: LeanCanvasOutput | any) {
+    const rawCanvasJson = typeof canvasData === 'string' ? canvasData : JSON.stringify(canvasData, null, 2);
+    return `${this.systemPrompt}
+
+Here is the founder's raw Lean Canvas JSON file:
+\`\`\`json
+${rawCanvasJson}
+\`\`\`
+
+Analyze the raw Lean Canvas file above (problem, solution, cost structure, unfair advantage). Generate an urgent email from ${this.name} (${AGENT_PERSONALITIES['derrick-vance'].email}) greeting the founder ("FOUNDER / MANAGER"), stating your role as ${this.role}, and explaining how you scout $100K NSF innovation grants and cloud credits matching their raw Lean Canvas.`;
+  },
+};
+
+export const StanHayesAgent: Agent = {
+  id: AGENT_PERSONALITIES['stan-hayes'].id,
+  name: AGENT_PERSONALITIES['stan-hayes'].name,
+  role: AGENT_PERSONALITIES['stan-hayes'].title,
+  systemPrompt: AGENT_PERSONALITIES['stan-hayes'].systemPromptTemplate,
+  generatePrompt(canvasData: LeanCanvasOutput | any) {
+    const rawCanvasJson = typeof canvasData === 'string' ? canvasData : JSON.stringify(canvasData, null, 2);
+    return `${this.systemPrompt}
+
+Here is the founder's raw Lean Canvas JSON file:
+\`\`\`json
+${rawCanvasJson}
+\`\`\`
+
+Analyze the raw Lean Canvas file above (key metrics, channels). Generate a direct schedule email from ${this.name} (${AGENT_PERSONALITIES['stan-hayes'].email}) greeting the founder concisely, stating your role as ${this.role}, and explaining how you protect 4-hour deep work focus blocks and decline unnecessary sales meetings.`;
+  },
+};
+
+export const RoryHowardAgent: Agent = {
+  id: AGENT_PERSONALITIES['rory-howard'].id,
+  name: AGENT_PERSONALITIES['rory-howard'].name,
+  role: AGENT_PERSONALITIES['rory-howard'].title,
+  systemPrompt: AGENT_PERSONALITIES['rory-howard'].systemPromptTemplate,
+  generatePrompt(canvasData: LeanCanvasOutput | any) {
+    const rawCanvasJson = typeof canvasData === 'string' ? canvasData : JSON.stringify(canvasData, null, 2);
+    return `${this.systemPrompt}
+
+Here is the founder's raw Lean Canvas JSON file:
+\`\`\`json
+${rawCanvasJson}
+\`\`\`
+
+Analyze the raw Lean Canvas file above (customer segments, channels). Generate a networking email from ${this.name} (${AGENT_PERSONALITIES['rory-howard'].email}) greeting the founder, stating your role as ${this.role}, and detailing how you crawl high-density VC networking socials, founder meetups, and demo nights matching their startup domain.`;
+  },
+};
+
+export const TobiasHendersonAgent: Agent = {
+  id: AGENT_PERSONALITIES['tobias-henderson'].id,
+  name: AGENT_PERSONALITIES['tobias-henderson'].name,
+  role: AGENT_PERSONALITIES['tobias-henderson'].title,
+  systemPrompt: AGENT_PERSONALITIES['tobias-henderson'].systemPromptTemplate,
+  generatePrompt(canvasData: LeanCanvasOutput | any) {
+    const rawCanvasJson = typeof canvasData === 'string' ? canvasData : JSON.stringify(canvasData, null, 2);
+    return `${this.systemPrompt}
+
+Here is the founder's raw Lean Canvas JSON file:
+\`\`\`json
+${rawCanvasJson}
+\`\`\`
+
+Analyze the raw Lean Canvas file above. Generate a safety & compliance email from ${this.name} (${AGENT_PERSONALITIES['tobias-henderson'].email}) greeting the founder politely, stating your role as ${this.role}, and explaining how you monitor 3.4s human delays, rate limits, and zero shadowban compliance.`;
+  },
+};
+
+export const AngelicaMartinAgent: Agent = {
+  id: AGENT_PERSONALITIES['angelica-martin'].id,
+  name: AGENT_PERSONALITIES['angelica-martin'].name,
+  role: AGENT_PERSONALITIES['angelica-martin'].title,
+  systemPrompt: AGENT_PERSONALITIES['angelica-martin'].systemPromptTemplate,
+  generatePrompt(canvasData: LeanCanvasOutput | any) {
+    const rawCanvasJson = typeof canvasData === 'string' ? canvasData : JSON.stringify(canvasData, null, 2);
+    return `${this.systemPrompt}
+
+Here is the founder's raw Lean Canvas JSON file:
+\`\`\`json
+${rawCanvasJson}
+\`\`\`
+
+Analyze the raw Lean Canvas file above (cost structure, revenue streams). Generate a budget audit email from ${this.name} (${AGENT_PERSONALITIES['angelica-martin'].email}) greeting the founder formally, stating your role as ${this.role}, and detailing how you audit daily API token spend, track burn rate, and cancel unused SaaS subscriptions.`;
+  },
+};
+
+export const ALL_AGENT_INSTANCES: Agent[] = [
+  MarcusScottAgent,
+  PamelaMillerAgent,
+  JimmyHarperAgent,
+  DerrickVanceAgent,
+  StanHayesAgent,
+  RoryHowardAgent,
+  TobiasHendersonAgent,
+  AngelicaMartinAgent,
+];
+
+
+
+
+
+
+
+

@@ -5,8 +5,9 @@ import { User,UserSchema } from './schemas/user.schema';
 import { MongooseModule } from '@nestjs/mongoose';
 import { AgentsService } from '../agents/agents.service';
 import { Neo4jStore } from '../memory/neo4j.store';
+import { EmailThread, EmailSchema } from '../agents/schemas/email.schema';
 @Module({
-  imports: [MongooseModule.forFeature([{ name: User.name, schema: UserSchema }])],
+  imports: [MongooseModule.forFeature([{ name: User.name, schema: UserSchema }, {name: EmailThread.name, schema: EmailSchema}])],
   controllers: [UserController],
   providers: [UserService, AgentsService, Neo4jStore]
 })

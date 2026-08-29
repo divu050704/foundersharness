@@ -1,10 +1,11 @@
-// Founders Harness Agents Registry & Realtime State Helpers
+// Founders Harness Agents Registry & Realtime State Helpers (Copyright-Safe Original Fleet)
 
 export const INITIAL_AGENTS = [
   {
     id: "michael",
-    name: "Michael Scott",
-    officeRole: "Chief Founder Co-pilot / Regional Manager",
+    name: "Marcus Scott",
+    email: "marcus.scott@foundersharness.ai",
+    officeRole: "Chief Founder Co-pilot / Regional Director",
     harnessDomain: "Master Founder Orchestrator",
     aiModel: "Claude 3.7 Sonnet (Orchestrator)",
     avatarColor: "#f59e0b",
@@ -24,13 +25,14 @@ export const INITIAL_AGENTS = [
     ],
     logs: [
       "[ORCHESTRATOR] Initialized Founder Harness control plane",
-      "[DELEGATE] Assigned LinkedIn & X post batch to Social Agent (Pam & Jim)",
-      "[DELEGATE] Triggered non-dilutive grant crawl for Dwight"
+      "[DELEGATE] Assigned LinkedIn & X post batch to Social Agent (Pamela & Jimmy)",
+      "[DELEGATE] Triggered non-dilutive grant crawl for Derrick"
     ]
   },
   {
     id: "pam",
-    name: "Pam Beesly",
+    name: "Pamela Miller",
+    email: "pamela.miller@foundersharness.ai",
     officeRole: "Social Media Calendar Builder & Content Designer",
     harnessDomain: "Social Media Automation",
     aiModel: "Gemini 2.5 Flash",
@@ -56,7 +58,8 @@ export const INITIAL_AGENTS = [
   },
   {
     id: "jim",
-    name: "Jim Halpert",
+    name: "Jimmy Harper",
+    email: "jimmy.harper@foundersharness.ai",
     officeRole: "Autonomous Browser Poster (Device-Hook Agent)",
     harnessDomain: "Browser Automation",
     aiModel: "Claude 3.5 Sonnet",
@@ -82,7 +85,8 @@ export const INITIAL_AGENTS = [
   },
   {
     id: "dwight",
-    name: "Dwight Schrute",
+    name: "Derrick Vance",
+    email: "derrick.vance@foundersharness.ai",
     officeRole: "Capital, Grants & VC Investment Scout",
     harnessDomain: "Capital & Grants Discovery",
     aiModel: "Grok-3 (Strict Verification)",
@@ -108,7 +112,8 @@ export const INITIAL_AGENTS = [
   },
   {
     id: "stanley",
-    name: "Stanley Hudson",
+    name: "Stan Hayes",
+    email: "stan.hayes@foundersharness.ai",
     officeRole: "Founder Day Planner & Focus Time Manager",
     harnessDomain: "Day Planning & Productivity",
     aiModel: "DeepSeek R1 (Logic Master)",
@@ -134,7 +139,8 @@ export const INITIAL_AGENTS = [
   },
   {
     id: "ryan",
-    name: "Ryan Howard",
+    name: "Rory Howard",
+    email: "rory.howard@foundersharness.ai",
     officeRole: "Local Meetups & Tech Event Scout",
     harnessDomain: "Networking & Demo Days",
     aiModel: "Claude 3.5 Haiku",
@@ -160,7 +166,8 @@ export const INITIAL_AGENTS = [
   },
   {
     id: "toby",
-    name: "Toby Flenderson",
+    name: "Tobias Henderson",
+    email: "tobias.henderson@foundersharness.ai",
     officeRole: "HR, API Rate Limit & Safety Guardrail Monitor",
     harnessDomain: "Safety & Compliance",
     aiModel: "Llama 3.3 (Safety Checked)",
@@ -185,7 +192,8 @@ export const INITIAL_AGENTS = [
   },
   {
     id: "angela",
-    name: "Angela Martin",
+    name: "Angelica Martin",
+    email: "angelica.martin@foundersharness.ai",
     officeRole: "Startup Budget Auditor & API Billing Bot",
     harnessDomain: "Financial Audit & Billing",
     aiModel: "Codex Mini",
@@ -205,10 +213,14 @@ export const INITIAL_AGENTS = [
     ],
     logs: [
       "[FINANCE] Total daily API automation cost: $0.12",
-      "[SAVINGS] Identified $240/mo in unused SaaS subscriptions to cancel"
+      "[AUDIT] Flagged 1 unused $49/mo SaaS subscription for review"
     ]
   }
 ];
+
+export function getAgentById(id) {
+  return INITIAL_AGENTS.find((a) => a.id === id) || INITIAL_AGENTS[0];
+}
 
 export const FOUNDER_DOMAINS = [
   { id: "social", name: "Social Media Automation", icon: "📱", desc: "Calendar Builder & Browser Poster" },

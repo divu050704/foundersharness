@@ -8,6 +8,12 @@ import WebSocket from 'ws';
 
 @Injectable()
 export class DeviceHookService implements OnModuleInit, OnModuleDestroy {
+  onModuleInit() {
+    throw new Error('Method not implemented.');
+  }
+  onModuleDestroy() {
+    throw new Error('Method not implemented.');
+  }
 
 
   // private readonly logger = new Logger(DeviceHookService.name);
