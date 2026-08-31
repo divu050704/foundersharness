@@ -2,14 +2,12 @@ import { Controller, Get, Redirect, Post, Body } from '@nestjs/common';
 import { Session } from '@thallesp/nestjs-better-auth';
 import type { UserSession } from '@thallesp/nestjs-better-auth';
 import { UserService } from './user.service';
-import { Neo4jStore } from '../memory/neo4j.store';
 
 
 @Controller('user')
 export class UserController {
     constructor(
         private readonly userService: UserService,
-        private readonly neo4jStore: Neo4jStore
     ) { }
     @Get()
     @Redirect()
@@ -30,10 +28,10 @@ export class UserController {
         return { exists, email: email || null };
     }
 
-    @Get("memory")
-    async getMemoryGraph(@Session() session: UserSession) {
-        const email = session?.user?.email || "";
-        const graph = await this.neo4jStore.getGraph(email);
-        return { graph: graph };
-    }
+    // @Get("memory")
+    // async getMemoryGraph(@Session() session: UserSession) {
+    //     const email = session?.user?.email || "";
+    //     const graph = await this.neo4jStore.getGraph(email);
+    //     return { graph: graph };
+    // }
 }

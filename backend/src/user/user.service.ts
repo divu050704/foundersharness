@@ -9,7 +9,7 @@ export class UserService {
     constructor(@InjectModel(User.name) private userModel: Model<User>) {}
 
     async checkUserStatus(email: string): Promise<boolean> {
-        const exists=  await this.userModel.exists({ email: email });
+        const exists=  await this.userModel.exists({ email: email, initialMemorySaved: true });
         return exists!==null ? true : false;
     }
     
