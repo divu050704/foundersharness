@@ -65,7 +65,7 @@ export class AgentsService {
     for (const call of result.tool_calls ?? []) {
       if (call.name === "create-calendar") {
         const toolResult = await this.pamelaMiller.createCalendarTool.invoke(call);
-        console.log(toolResult)
+        console.log(toolResult.content)
         // do something with toolResult — save it, feed it back to the model, etc.
       }
     }

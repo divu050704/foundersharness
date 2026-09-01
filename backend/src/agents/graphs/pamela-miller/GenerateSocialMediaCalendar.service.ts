@@ -48,7 +48,7 @@ export class GenerateSocialMediaCalendar {
 
     private retrievePastPosts: GraphNode<typeof this.stateSchema> = async (state) => {
         this.logger.debug("Retreiving posts")
-        const posts = await this.useBrowser.graph.invoke({ session: state.session, query: "Scrape 3 past posts and collect there text content", maxSteps: 5, stepNumber: 0 })
+        const posts = await this.useBrowser.graph.invoke({ session: state.session, query: `Scrape 3 past posts from the user's profile and collect text content of the post to satisy user's query: ${state.query}`, maxSteps: 5, stepNumber: 0 })
         return { pastPostsData: posts.dataFound, humanInterventionRequired: posts.humanInterventionRequired, humanInterventionMessage: posts.humanInterventionMessage }
     }
 
