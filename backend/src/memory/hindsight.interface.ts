@@ -22,7 +22,7 @@ export const HindsightRecallResultSchema = z.object({
 
 export const HindsightRecallResponseSchema = z.object({
   results: z.array(HindsightRecallResultSchema),
-  entities: z.any(),
+  entities: z.any().optional(),
 });
 
 export type HindsightRecallResponse =

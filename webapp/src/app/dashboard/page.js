@@ -42,9 +42,7 @@ export default function DedicatedOfficeApp() {
           console.warn("Better Auth session check warning:", authErr);
         }
 
-        // Check local user fallback if session check offline
-        const userJson = typeof window !== "undefined" ? localStorage.getItem("founder_user") : null;
-        if (!hasActiveSession && !userJson) {
+        if (!hasActiveSession) {
           toast.error("Authentication required. Please sign in.");
           router.replace("/login");
           return;
@@ -58,22 +56,8 @@ export default function DedicatedOfficeApp() {
         }
       } catch (err) {
         console.error("Error hitting /api/user or verifying session:", err);
-        const userJson = typeof window !== "undefined" ? localStorage.getItem("founder_user") : null;
-        if (!userJson) {
-          router.replace("/login");
-          return;
-        }
-        try {
-          const user = JSON.parse(userJson);
-          const userOnboardedKey = `founder_onboarded_${user.email}`;
-          const onboarded = localStorage.getItem(userOnboardedKey) || localStorage.getItem("founder_onboarded");
-          if (onboarded === "false") {
-            router.replace("/onboarding");
-            return;
-          }
-        } catch (e) {
-          console.error(e);
-        }
+        router.replace("/login");
+        return;
       } finally {
         setCheckingUser(false);
       }

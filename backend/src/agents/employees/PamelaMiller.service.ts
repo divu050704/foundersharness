@@ -5,11 +5,11 @@ import { GenerateSocialMediaCalendar } from "../graphs/pamela-miller/GenerateSoc
 import z from "zod";
 import { tool } from "@langchain/core/tools";
 import { HindsightService } from "../../memory/hindsight.service";
-
+import { MemoryService } from "../../memory/memory.service";
 @Injectable()
 export class PamelaMillerService {
     constructor(private readonly generateSocialMediaCalendar: GenerateSocialMediaCalendar,
-        private readonly hindsightservice: HindsightService,
+        private readonly memory: MemoryService,
         private readonly logger: Logger
     ) { }
 
@@ -18,8 +18,8 @@ export class PamelaMillerService {
     })
 
     createCalendarTool = tool(async ({ query, session }) => {
-        this.logger.debug("Extracting Memories")
-        const memories = await this.hindsightservice.retrieveMemory(session, query)
+        this.logger.debug("Extracting Knowledge")
+        const memories = await this.memory.recall(session, query)
         this.logger.debug("Invoking Pamela Miller")
 
         return await this.generateSocialMediaCalendar.graph.invoke({ query, memories, session })

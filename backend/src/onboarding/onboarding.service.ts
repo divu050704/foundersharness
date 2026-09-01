@@ -11,6 +11,7 @@ import { AGENT_PERSONALITIES } from '../agents/agent-personalities';
 import { StateGraph, Annotation, START, END } from "@langchain/langgraph";
 import { ChatGoogleGenerativeAI } from '@langchain/google-genai';
 import { HindsightService } from '../memory/hindsight.service';
+import { MemoryService } from '../memory/memory.service';
 
 // State Annotation Schema for LangGraph Parallel Fleet Execution
 export const FleetEmailAnnotation = Annotation.Root({
@@ -42,7 +43,8 @@ export class OnboardingService {
   constructor(
     private readonly agentsService: AgentsService,
     @InjectModel(User.name) private userModel: Model<User>,
-    private readonly hindisightService: HindsightService
+    private readonly hindisightService: HindsightService,
+    private readonly memory: MemoryService
   ) { }
 
   async create(createOnboardingDto: CreateOnboardingDto[], email: string) {
@@ -59,6 +61,12 @@ export class OnboardingService {
 
     this.logger.log(`Extracting features from LeanCanvas for email: ${email}`);
     await this.hindisightService.retainCanvas(email, Canvas)
+   await this.memory.save(email, {
+      type: 'canvas',
+      content: Canvas,
+      summary: `Lean canvas: ${Canvas.problem} — targeting ${Canvas.customerSegments}`,
+      producedBy: 'lean-canvas-agent',
+    });
     await this.userModel.updateOne({email: email}, {initialMemorySaved: true})   
 
     this.logger.log(`Successfully stored memory extraction for email: ${email}`);
@@ -110,7 +118,7 @@ export class OnboardingService {
 
       for (const msg of messagesList) {
         try {
-          const savedThread = await this.agentsService.initiateAgent(
+          const savedThread = await this.agentsService.saveEmail(
             {
               receiver: state.userEmail,
               subject: msg.subject,

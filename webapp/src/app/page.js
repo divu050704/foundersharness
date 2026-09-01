@@ -7,26 +7,31 @@ export default function Home() {
   const router = useRouter();
 
   useEffect(() => {
-    const userJson = localStorage.getItem("founder_user");
-    if (!userJson) {
-      router.replace("/login");
-      return;
-    }
+    async function checkAuth() {
+      try {
+        const { authClient } = await import('@/lib/auth-client');
+        const sessionRes = await authClient.getSession();
+        
+        if (!sessionRes?.data?.user && !sessionRes?.data?.session) {
+          router.replace("/login");
+          return;
+        }
 
-    try {
-      const user = JSON.parse(userJson);
-      const userOnboardedKey = `founder_onboarded_${user.email}`;
-      const onboarded = localStorage.getItem(userOnboardedKey) || localStorage.getItem("founder_onboarded");
-      
-      if (onboarded === "true") {
-        router.replace("/dashboard");
-      } else {
-        router.replace("/onboarding");
+        const { api } = await import('@/lib/api');
+        const res = await api.get("/api/user/status");
+        
+        if (res && res.exists === false) {
+          router.replace("/onboarding");
+        } else {
+          router.replace("/dashboard");
+        }
+      } catch (err) {
+        console.error("Auth check failed:", err);
+        router.replace("/login");
       }
-    } catch (e) {
-      console.error(e);
-      router.replace("/login");
     }
+    
+    checkAuth();
   }, [router]);
 
   return (

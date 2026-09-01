@@ -38,7 +38,6 @@ export class HindsightService {
       `user:${email}`,
       query,
     );
-    console.log(result)
     return result;
   }
 }

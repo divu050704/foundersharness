@@ -115,6 +115,7 @@ export default function MichaelScottOSModal({
   const [emailAttachments, setEmailAttachments] = useState("");
   const [sentNotification, setSentNotification] = useState("");
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const [showForm, setShowForm] = useState(false);
   const [emails, setEmails] = useState(getInitialEmails);
 
   // Fetch threads from backend DB on mount
@@ -172,6 +173,26 @@ export default function MichaelScottOSModal({
       a.officeRole.toLowerCase().includes(query)
     );
   });
+
+  const handleComposeClick = () => {
+    playRetroSound("click");
+    setRecipientEmail("");
+    setEmailSubject("");
+    setEmailAttachments("");
+    setEmailBody("");
+    setShowForm(true);
+  };
+
+  const handleReplyClick = () => {
+    playRetroSound("click");
+    if (selectedEmail) {
+      setRecipientEmail(selectedEmail.senderEmail || selectedEmail.sender);
+      setEmailSubject(`Re: ${selectedEmail.subject}`);
+      setEmailAttachments("");
+      setEmailBody("");
+      setShowForm(true);
+    }
+  };
 
   const handleSendEmail = async (e) => {
     e.preventDefault();
@@ -271,6 +292,7 @@ export default function MichaelScottOSModal({
     setEmailBody("");
     setEmailAttachments("");
     setShowSuggestions(false);
+    setShowForm(false);
   };
 
   return (
@@ -478,6 +500,7 @@ export default function MichaelScottOSModal({
                                 onClick={() => {
                                   playRetroSound("click");
                                   setSelectedEmailId(item.id);
+                                  setShowForm(false);
                                 }}
                                 className={`w-full text-left p-2 rounded border cursor-pointer transition-all ${
                                   isSelected
@@ -512,20 +535,29 @@ export default function MichaelScottOSModal({
                     </div>
 
                     {/* Right: Email Detail View & Send Message Box */}
-                    <div className="flex-1 bg-white border border-[#7f9db9] rounded p-3 flex flex-col overflow-hidden">
+                    <div className="flex-1 bg-white border border-[#7f9db9] rounded p-3 flex flex-col overflow-hidden relative">
+                      {/* Top Right Compose Button */}
+                      <div className="absolute top-3 right-3 z-10">
+                        <button
+                          type="button"
+                          onClick={handleComposeClick}
+                          className="bg-[#0055ea] hover:bg-[#0047bf] text-white font-pixel text-xs px-3 py-1.5 rounded border border-[#003da6] shadow cursor-pointer font-bold flex items-center gap-1"
+                        >
+                          <FileText className="size-3.5" />
+                          <span>COMPOSE</span>
+                        </button>
+                      </div>
+
                       {selectedEmail ? (
                         <>
                           {/* Email Header */}
-                          <div className="border-b border-[#7f9db9] pb-2 mb-2">
+                          <div className="border-b border-[#7f9db9] pb-2 mb-2 pr-28">
                             <div className="flex items-center justify-between">
                               <h4 className="font-pixel text-xs text-[#0055ea] font-bold">
                                 {selectedEmail.subject}
                               </h4>
-                              <span className="text-[10px] text-slate-500 font-bold">
-                                Received: {formatEmailDate(selectedEmail.createdAt)} at {selectedEmail.time}
-                              </span>
                             </div>
-                            <div className="text-[11px] text-slate-700 mt-1 font-bold flex flex-wrap justify-between gap-1">
+                            <div className="text-[11px] text-slate-700 mt-1 font-bold flex flex-wrap justify-between gap-1 items-center">
                               <div>
                                 From:{" "}
                                 <span className="text-[#0055ea]">
@@ -533,17 +565,22 @@ export default function MichaelScottOSModal({
                                 </span>{" "}
                                 ({selectedEmail.senderEmail || selectedEmail.role})
                               </div>
-                              <div>
-                                To:{" "}
-                                <span className="text-[#0055ea]">
-                                  {selectedEmail.receiver}
+                              <div className="flex items-center gap-3">
+                                <div>
+                                  To:{" "}
+                                  <span className="text-[#0055ea]">
+                                    {selectedEmail.receiver}
+                                  </span>
+                                </div>
+                                <span className="text-[10px] text-slate-500 font-bold">
+                                  {formatEmailDate(selectedEmail.createdAt)} at {selectedEmail.time}
                                 </span>
                               </div>
                             </div>
                           </div>
 
                           {/* Reading Pane */}
-                          <div className="flex-1 bg-[#fdfdfd] border border-[#eee] p-3 rounded text-xs text-slate-800 font-mono whitespace-pre-line leading-relaxed overflow-y-auto mb-3 shadow-inner">
+                          <div className="flex-1 bg-[#fdfdfd] border border-[#eee] p-3 rounded text-xs text-slate-800 font-mono whitespace-pre-line leading-relaxed overflow-y-auto mb-3 shadow-inner relative">
                             {selectedEmail.body}
                             {selectedEmail.attachments && selectedEmail.attachments.length > 0 && (
                               <div className="mt-3 pt-2 border-t border-slate-200 text-[10px] text-slate-600 font-bold flex items-center gap-1.5">
@@ -554,6 +591,19 @@ export default function MichaelScottOSModal({
                                 </span>
                               </div>
                             )}
+                            
+                            {!showForm && (
+                              <div className="mt-6">
+                                <button
+                                  type="button"
+                                  onClick={handleReplyClick}
+                                  className="bg-[#f0f4f9] hover:bg-[#e1e9f4] text-[#0055ea] font-pixel text-xs px-3 py-1.5 rounded border border-[#7f9db9] shadow cursor-pointer font-bold flex items-center gap-1"
+                                >
+                                  <Send className="size-3.5" />
+                                  <span>REPLY</span>
+                                </button>
+                              </div>
+                            )}
                           </div>
                         </>
                       ) : (
@@ -561,7 +611,7 @@ export default function MichaelScottOSModal({
                           <Mail className="size-10 text-slate-300 mb-2" />
                           <p className="font-pixel text-xs text-slate-600 font-bold">NO THREAD SELECTED</p>
                           <p className="text-[10px] text-slate-400 mt-1 max-w-xs">
-                            Type an agent's email in the compose box below to start a new email thread!
+                            Click Compose to start a new email thread!
                           </p>
                         </div>
                       )}
@@ -574,104 +624,118 @@ export default function MichaelScottOSModal({
                       )}
 
                       {/* Compose Email Form with Agent Email Autocomplete */}
-                      <form
-                        onSubmit={handleSendEmail}
-                        className="bg-[#f0f4f9] border border-[#7f9db9] p-2.5 rounded space-y-2 relative"
-                      >
-                        <div className="flex items-center gap-2 text-xs relative">
-                          <span className="font-bold text-slate-700 font-pixel shrink-0">
-                            To (Agent Email):
-                          </span>
+                      {showForm && (
+                        <form
+                          onSubmit={handleSendEmail}
+                          className="bg-[#f0f4f9] border border-[#7f9db9] p-2.5 rounded space-y-2 relative"
+                        >
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="font-pixel text-[10px] text-[#0055ea] font-bold">
+                              {emailSubject.startsWith("Re:") ? "REPLY MESSAGE" : "NEW MESSAGE"}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => setShowForm(false)}
+                              className="text-slate-500 hover:text-red-500 text-xs font-bold"
+                            >
+                              ✕
+                            </button>
+                          </div>
+                          <div className="flex items-center gap-2 text-xs relative">
+                            <span className="font-bold text-slate-700 font-pixel shrink-0">
+                              To (Agent):
+                            </span>
 
-                          <div className="relative flex-1">
-                            <input
-                              type="text"
-                              value={recipientEmail}
-                              onFocus={() => setShowSuggestions(true)}
-                              onChange={(e) => {
-                                setRecipientEmail(e.target.value);
-                                setShowSuggestions(true);
-                              }}
-                              placeholder="Type agent email (e.g. dwight.schrute@dundermifflin.com)..."
-                              className="w-full bg-white border border-[#7f9db9] px-2 py-1 text-xs rounded text-slate-900 placeholder:text-slate-400 focus:outline-none font-mono"
-                            />
+                            <div className="relative flex-1">
+                              <input
+                                type="text"
+                                value={recipientEmail}
+                                onFocus={() => setShowSuggestions(true)}
+                                onChange={(e) => {
+                                  setRecipientEmail(e.target.value);
+                                  setShowSuggestions(true);
+                                }}
+                                placeholder="Type agent email (e.g. dwight.schrute@dundermifflin.com)..."
+                                className="w-full bg-white border border-[#7f9db9] px-2 py-1 text-xs rounded text-slate-900 placeholder:text-slate-400 focus:outline-none font-mono"
+                              />
 
-                            {/* Auto-complete suggestions dropdown */}
-                            {showSuggestions && suggestions.length > 0 && (
-                              <div className="absolute left-0 right-0 bottom-full mb-1 bg-white border-2 border-[#0055ea] rounded shadow-2xl z-50 max-h-48 overflow-y-auto">
-                                <div className="px-2 py-1 bg-[#ece9d8] border-b text-[10px] font-pixel text-[#0055ea] font-bold">
-                                  AGENT EMAIL SUGGESTIONS ({suggestions.length})
-                                </div>
-                                {suggestions.map((agent) => (
+                              {/* Auto-complete suggestions dropdown */}
+                              {showSuggestions && suggestions.length > 0 && (
+                                <div className="absolute left-0 right-0 bottom-full mb-1 bg-white border-2 border-[#0055ea] rounded shadow-2xl z-50 max-h-48 overflow-y-auto">
+                                  <div className="px-2 py-1 bg-[#ece9d8] border-b text-[10px] font-pixel text-[#0055ea] font-bold">
+                                    AGENT EMAIL SUGGESTIONS ({suggestions.length})
+                                  </div>
+                                  {suggestions.map((agent) => (
+                                    <button
+                                      type="button"
+                                      key={agent.id}
+                                      onMouseDown={() => {
+                                        setRecipientEmail(agent.email || `${agent.id}@dundermifflin.com`);
+                                        setSelectedAgentId(agent.id);
+                                        setShowSuggestions(false);
+                                      }}
+                                      className="w-full text-left px-2 py-1.5 hover:bg-[#316ac5] hover:text-white text-xs border-b border-slate-100 flex items-center justify-between cursor-pointer transition-colors"
+                                    >
+                                      <div>
+                                        <span className="font-bold">{agent.name}</span>{" "}
+                                        <span className="text-[10px] opacity-80">&lt;{agent.email}&gt;</span>
+                                      </div>
+                                      <span className="text-[9px] opacity-70 font-mono">{agent.officeRole.split(" ")[0]}</span>
+                                    </button>
+                                  ))}
+
                                   <button
                                     type="button"
-                                    key={agent.id}
                                     onMouseDown={() => {
-                                      setRecipientEmail(agent.email || `${agent.id}@dundermifflin.com`);
-                                      setSelectedAgentId(agent.id);
+                                      setRecipientEmail("all.agents@dundermifflin.com");
+                                      setSelectedAgentId("all");
                                       setShowSuggestions(false);
                                     }}
-                                    className="w-full text-left px-2 py-1.5 hover:bg-[#316ac5] hover:text-white text-xs border-b border-slate-100 flex items-center justify-between cursor-pointer transition-colors"
+                                    className="w-full text-left px-2 py-1.5 bg-amber-50 hover:bg-amber-500 hover:text-white text-xs font-bold text-amber-800 flex items-center justify-between cursor-pointer transition-colors"
                                   >
-                                    <div>
-                                      <span className="font-bold">{agent.name}</span>{" "}
-                                      <span className="text-[10px] opacity-80">&lt;{agent.email}&gt;</span>
-                                    </div>
-                                    <span className="text-[9px] opacity-70 font-mono">{agent.officeRole.split(" ")[0]}</span>
+                                    <span>📢 BROADCAST TO ALL AGENTS</span>
+                                    <span className="text-[9px] font-mono">&lt;all.agents@dundermifflin.com&gt;</span>
                                   </button>
-                                ))}
-
-                                <button
-                                  type="button"
-                                  onMouseDown={() => {
-                                    setRecipientEmail("all.agents@dundermifflin.com");
-                                    setSelectedAgentId("all");
-                                    setShowSuggestions(false);
-                                  }}
-                                  className="w-full text-left px-2 py-1.5 bg-amber-50 hover:bg-amber-500 hover:text-white text-xs font-bold text-amber-800 flex items-center justify-between cursor-pointer transition-colors"
-                                >
-                                  <span>📢 BROADCAST TO ALL AGENTS</span>
-                                  <span className="text-[9px] font-mono">&lt;all.agents@dundermifflin.com&gt;</span>
-                                </button>
-                              </div>
-                            )}
+                                </div>
+                              )}
+                            </div>
                           </div>
-                        </div>
 
-                        <input
-                          type="text"
-                          value={emailSubject}
-                          onChange={(e) => setEmailSubject(e.target.value)}
-                          placeholder="Subject (e.g. Execute LinkedIn batch / Crawl VC credits)"
-                          className="w-full bg-white border border-[#7f9db9] px-2 py-1 text-xs rounded text-slate-900 placeholder:text-slate-400 focus:outline-none"
-                        />
-
-                        <input
-                          type="text"
-                          value={emailAttachments}
-                          onChange={(e) => setEmailAttachments(e.target.value)}
-                          placeholder="Attachments (comma separated files/links, e.g. spec.pdf, mockup.png)"
-                          className="w-full bg-white border border-[#7f9db9] px-2 py-1 text-xs rounded text-slate-900 placeholder:text-slate-400 focus:outline-none"
-                        />
-
-                        <div className="flex items-center gap-2">
-                          <textarea
-                            value={emailBody}
-                            onChange={(e) => setEmailBody(e.target.value)}
-                            placeholder="Write instruction email body..."
-                            rows={2}
-                            className="flex-1 bg-white border border-[#7f9db9] p-2 text-xs rounded text-slate-900 placeholder:text-slate-400 focus:outline-none resize-none"
+                          <input
+                            type="text"
+                            value={emailSubject}
+                            onChange={(e) => setEmailSubject(e.target.value)}
+                            placeholder="Subject (e.g. Execute LinkedIn batch / Crawl VC credits)"
+                            className="w-full bg-white border border-[#7f9db9] px-2 py-1 text-xs rounded text-slate-900 placeholder:text-slate-400 focus:outline-none"
                           />
-                          <button
-                            type="submit"
-                            disabled={!emailBody.trim() || !recipientEmail.trim()}
-                            className="bg-[#0055ea] hover:bg-[#0047bf] text-white font-pixel text-xs px-4 py-3 rounded border border-[#003da6] shadow cursor-pointer font-bold disabled:opacity-50 flex items-center gap-1 shrink-0"
-                          >
-                            <Send className="size-3.5" />
-                            <span>SEND MAIL</span>
-                          </button>
-                        </div>
-                      </form>
+
+                          <input
+                            type="text"
+                            value={emailAttachments}
+                            onChange={(e) => setEmailAttachments(e.target.value)}
+                            placeholder="Attachments (comma separated files/links, e.g. spec.pdf, mockup.png)"
+                            className="w-full bg-white border border-[#7f9db9] px-2 py-1 text-xs rounded text-slate-900 placeholder:text-slate-400 focus:outline-none"
+                          />
+
+                          <div className="flex items-center gap-2">
+                            <textarea
+                              value={emailBody}
+                              onChange={(e) => setEmailBody(e.target.value)}
+                              placeholder="Write instruction email body..."
+                              rows={2}
+                              className="flex-1 bg-white border border-[#7f9db9] p-2 text-xs rounded text-slate-900 placeholder:text-slate-400 focus:outline-none resize-none"
+                            />
+                            <button
+                              type="submit"
+                              disabled={!emailBody.trim() || !recipientEmail.trim()}
+                              className="bg-[#0055ea] hover:bg-[#0047bf] text-white font-pixel text-xs px-4 py-3 rounded border border-[#003da6] shadow cursor-pointer font-bold disabled:opacity-50 flex items-center gap-1 shrink-0"
+                            >
+                              <Send className="size-3.5" />
+                              <span>SEND MAIL</span>
+                            </button>
+                          </div>
+                        </form>
+                      )}
                     </div>
                   </div>
                 )}

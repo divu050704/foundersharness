@@ -127,11 +127,21 @@ export default function Onboarding() {
 
   useEffect(() => {
     setIsMounted(true);
-    const user = localStorage.getItem("founder_user");
-    if (!user) {
-      router.replace("/login");
-      return;
+    
+    async function checkAuth() {
+      try {
+        const { authClient } = await import('@/lib/auth-client');
+        const sessionRes = await authClient.getSession();
+        if (!sessionRes?.data?.user && !sessionRes?.data?.session) {
+          router.replace("/login");
+          return;
+        }
+      } catch (err) {
+        console.error("Auth check failed:", err);
+        router.replace("/login");
+      }
     }
+    checkAuth();
     const saved = localStorage.getItem("founder_onboarding_answers");
     if (saved) {
       try {

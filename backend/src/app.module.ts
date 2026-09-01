@@ -10,6 +10,7 @@ import { auth } from './auth'; // your betterAuth(...) instance
 
 import { MongooseModule } from '@nestjs/mongoose';
 import { UserModule } from './user/user.module';
+import { MemoryModule } from './memory/memory.module';
 
 @Module({
   imports: [
@@ -23,6 +24,7 @@ import { UserModule } from './user/user.module';
           config.get<string>('DATABASE_URL'),
       }),
     }),
+    MemoryModule,
     OnboardingModule,
     AgentsModule,
     AuthModule.forRoot(auth), // ← pass your auth instance here

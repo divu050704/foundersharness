@@ -23,6 +23,7 @@
     "@langchain/core": "^1.2.9",
     "@langchain/google-genai": "^2.3.0",
     "@langchain/langgraph": "^1.4.12",
+    "@langchain/langgraph-checkpoint-mongodb": "^1.4.1",
     "@nestjs/common": "^11.0.1",
     "@nestjs/config": "^4.0.4",
     "@nestjs/core": "^11.0.1",
