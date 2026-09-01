@@ -10,10 +10,17 @@ import { Model } from "mongoose";
 import { EmailAgentDTO } from "./dto/email-agent.dto";
 import { InjectModel } from "@nestjs/mongoose";
 import { EmailThread } from "./schemas/email.schema";
+import { PamelaMillerService } from "./employees/PamelaMiller.service";
+import { HindsightService } from "../memory/hindsight.service";
+import { AGENT_PERSONALITIES } from "./agent-personalities";
 
 @Injectable()
 export class AgentsService {
-  constructor(@InjectModel(EmailThread.name) private emailModel: Model<EmailThread>) { }
+  constructor(
+    @InjectModel(EmailThread.name) private emailModel: Model<EmailThread>,
+    private readonly pamelaMiller: PamelaMillerService,
+    private readonly hindsightService: HindsightService,
+    private readonly logger: Logger) { }
   private model = new ChatGoogleGenerativeAI({
     apiKey: process.env.GEMINI_API_KEY,
     model: "gemini-3.5-flash-lite"
@@ -48,18 +55,33 @@ export class AgentsService {
 
   async initiateAgent(email: EmailAgentDTO, sender: string) {
     const isAgentSender = sender.includes('@foundersharness.ai') || sender.includes('@dundermifflin.com');
-    const createEmailThread = new this.emailModel({
-      emails: [{
-        attachments: email.attachments || [],
-        content: email.content,
-        read: false,
-        receiver: email.receiver,
-        sender: sender
-      }],
-      subject: email.subject,
-      agent: isAgentSender ? sender : email.receiver
-    })
-    return await createEmailThread.save()
+    const prompt = `
+    Make use of available tools and answer the user's query based on your personality
+    Personality: ${AGENT_PERSONALITIES['pamela-miller'].personalitySummary}
+    Query: ${email.content}
+    Session Name: ${sender}
+    `
+    const result = await this.pamelaMiller.modelWithTools.invoke(prompt)
+    for (const call of result.tool_calls ?? []) {
+      if (call.name === "create-calendar") {
+        const toolResult = await this.pamelaMiller.createCalendarTool.invoke(call);
+        console.log(toolResult)
+        // do something with toolResult — save it, feed it back to the model, etc.
+      }
+    }
+    // const createEmailThread = new this.emailModel({
+    //   emails: [{
+    //     attachments: email.attachments || [],
+    //     content: email.content,
+    //     read: false,
+    //     receiver: email.receiver,
+    //     sender: sender
+    //   }],
+    //   subject: email.subject,
+    //   agent: isAgentSender ? sender : email.receiver
+    // })
+    // return await createEmailThread.save()
+    // PamelaMiller.
   }
 
   async getEmailThreads(): Promise<EmailThread[]> {

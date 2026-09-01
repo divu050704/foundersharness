@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { HindsightClient } from '@vectorize-io/hindsight-client';
 import { LeanCanvasOutput } from '../agents/schema';
+import { HindsightRecallResponse } from './hindsight.interface';
 
 @Injectable()
 export class HindsightService {
@@ -31,5 +32,13 @@ export class HindsightService {
       total_entities: number;
       total_edges: number;
     }>;
+  }
+  async retrieveMemory(email: string, query: string): Promise<HindsightRecallResponse> {
+    const result: Promise<HindsightRecallResponse> | any = await this.client.recall(
+      `user:${email}`,
+      query,
+    );
+    console.log(result)
+    return result;
   }
 }
