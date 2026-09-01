@@ -440,10 +440,10 @@ export default function Onboarding() {
       <header className="absolute top-6 left-6 right-6 flex items-center justify-between border-b border-border/40 pb-3">
         <div className="flex items-center gap-2.5">
           <div className="size-6 rounded bg-[#f59e0b]/20 border border-[#f59e0b] flex items-center justify-center font-pixel text-[#f59e0b] text-[10px]">
-            MD
+            FH
           </div>
           <span className="font-pixel text-[10px] tracking-widest text-[#f59e0b] uppercase">
-            MUNDER DIFFLIN // FOUNDERS HARNESS
+            FOUNDER HARNESS
           </span>
         </div>
         <div className="flex items-center gap-3">

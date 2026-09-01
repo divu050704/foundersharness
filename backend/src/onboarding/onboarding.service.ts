@@ -139,7 +139,7 @@ export class OnboardingService {
     return workflow.compile();
   }
 
-  async generateEmails(canvasData: LeanCanvasOutput | EntityExtractorOutput | any, email: string) {
+  async generateEmails(canvasData: LeanCanvasOutput, email: string) {
     this.logger.log(`Invoking LangGraph parallel fleet email graph for user: ${email}`);
 
     const graph = this.buildFleetEmailGraph();

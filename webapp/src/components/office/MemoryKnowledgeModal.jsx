@@ -5,70 +5,75 @@ import { X, Brain, GitBranch, RefreshCw, Cpu, AlertTriangle } from "lucide-react
 import { playRetroSound } from "@/lib/retroAudio";
 import api from "@/lib/api";
 
-// Fallback Default Graph Structure matching backend { graph: { nodes, edges } } schema
+// Helper function to normalize both Cytoscape { data: { ... } } and flat { id, label, ... } graph structures
+export function normalizeGraphData(rawGraph) {
+  if (!rawGraph) return { nodes: [], edges: [] };
+
+  const target = rawGraph.graph || rawGraph;
+  const rawNodes = target.nodes || [];
+  const rawEdges = target.edges || [];
+
+  const nodes = rawNodes.map((n) => {
+    const data = n.data || n;
+    const label = data.label || data.name || data.id || "Entity";
+    return {
+      id: data.id || label,
+      label: label,
+      displayLabel: label,
+      color: data.color || n.color,
+      mentionCount: data.mentionCount || n.mentionCount || 1,
+      properties: data.properties || {
+        mentionCount: data.mentionCount || 1,
+        color: data.color || "#90caf9",
+        id: data.id,
+      },
+    };
+  });
+
+  const edges = rawEdges.map((e) => {
+    const data = e.data || e;
+    return {
+      id: data.id || `${data.source}-${data.target}`,
+      source: data.source || e.source,
+      target: data.target || e.target,
+      type: data.linkType || data.type || e.type || "cooccurrence",
+      weight: data.weight || e.weight || 1,
+      color: data.color || e.color || "#ffd700",
+      lineStyle: data.lineStyle || "solid",
+      properties: data.properties || {
+        linkType: data.linkType || "cooccurrence",
+        lastCooccurred: data.lastCooccurred,
+        weight: data.weight || 1,
+      },
+    };
+  });
+
+  return { nodes, edges };
+}
+
+// Fallback Default Graph Structure matching backend { graph: { nodes, edges } } Cytoscape schema
 const DEFAULT_MEMORY_GRAPH = {
   nodes: [
-    {
-      id: "Leeglin",
-      label: "Company",
-      properties: { stage: "MVP launched" }
-    },
-    {
-      id: "Indian Law firms",
-      label: "Customer",
-      properties: { seatPricing: "7000", pricing: "7,000 per seat" }
-    },
-    {
-      id: "SISF",
-      label: "Investor",
-      properties: { status: "Raised" }
-    },
-    {
-      id: "Private VCs",
-      label: "Investor",
-      properties: { status: "Targeting" }
-    },
-    {
-      id: "Gmail",
-      label: "Tool",
-      properties: {}
-    },
-    {
-      id: "Google Calendar",
-      label: "Tool",
-      properties: {}
-    },
-    {
-      id: "WhatsApp",
-      label: "Tool",
-      properties: {}
-    },
-    {
-      id: "Jira",
-      label: "Tool",
-      properties: {}
-    },
-    {
-      id: "Founder 1",
-      label: "Founder",
-      properties: { background: "Ex-EY, government incubators, law firm associate" }
-    },
-    {
-      id: "Founder 2",
-      label: "Founder",
-      properties: { background: "Technical startup builder" }
-    }
+    { data: { id: "1c74f7aa-94c3-4269-9ecf-045fb2ecada3", label: "legal industry", mentionCount: 1, color: "#90caf9" } },
+    { data: { id: "7948de0e-9199-48c6-a371-0976c9b6d7f7", label: "user", mentionCount: 2, color: "#42a5f5" } },
+    { data: { id: "8559d88b-e891-4a26-9fac-b98c056e8bb0", label: "EY", mentionCount: 1, color: "#90caf9" } },
+    { data: { id: "0f4eb283-9602-4b12-bd01-e511172b8141", label: "SaaS", mentionCount: 1, color: "#90caf9" } },
+    { data: { id: "4654984f-36e6-4e95-885b-269c432cc88d", label: "pricing", mentionCount: 1, color: "#90caf9" } },
+    { data: { id: "1c6a04de-e872-4b0b-b00d-a4d3c96e0faa", label: "AI", mentionCount: 1, color: "#90caf9" } },
+    { data: { id: "b2d8fc9a-1cc4-4038-a0d7-34170c18f176", label: "Indian law firms", mentionCount: 1, color: "#90caf9" } },
+    { data: { id: "75e35b40-db12-457b-950d-bf865d7b54f7", label: "legal tech", mentionCount: 1, color: "#90caf9" } }
   ],
   edges: [
-    { source: "Leeglin", target: "Indian Law firms", type: "TARGETS", properties: {} },
-    { source: "Leeglin", target: "SISF", type: "RAISED_FROM", properties: {} },
-    { source: "Leeglin", target: "Private VCs", type: "TARGETS", properties: {} },
-    { source: "Leeglin", target: "Gmail", type: "USES", properties: {} },
-    { source: "Leeglin", target: "Google Calendar", type: "USES", properties: {} },
-    { source: "Leeglin", target: "WhatsApp", type: "USES", properties: {} },
-    { source: "Leeglin", target: "Jira", type: "USES", properties: {} },
-    { source: "Founder 1", target: "Leeglin", type: "FOUNDED", properties: {} },
-    { source: "Founder 2", target: "Leeglin", type: "FOUNDED", properties: {} }
+    { data: { id: "e1", source: "1c74f7aa-94c3-4269-9ecf-045fb2ecada3", target: "7948de0e-9199-48c6-a371-0976c9b6d7f7", linkType: "cooccurrence", weight: 1, color: "#ffd700" } },
+    { data: { id: "e2", source: "7948de0e-9199-48c6-a371-0976c9b6d7f7", target: "8559d88b-e891-4a26-9fac-b98c056e8bb0", linkType: "cooccurrence", weight: 1, color: "#ffd700" } },
+    { data: { id: "e3", source: "1c74f7aa-94c3-4269-9ecf-045fb2ecada3", target: "8559d88b-e891-4a26-9fac-b98c056e8bb0", linkType: "cooccurrence", weight: 1, color: "#ffd700" } },
+    { data: { id: "e4", source: "0f4eb283-9602-4b12-bd01-e511172b8141", target: "4654984f-36e6-4e95-885b-269c432cc88d", linkType: "cooccurrence", weight: 1, color: "#ffd700" } },
+    { data: { id: "e5", source: "1c6a04de-e872-4b0b-b00d-a4d3c96e0faa", target: "b2d8fc9a-1cc4-4038-a0d7-34170c18f176", linkType: "cooccurrence", weight: 1, color: "#ffd700" } },
+    { data: { id: "e6", source: "1c6a04de-e872-4b0b-b00d-a4d3c96e0faa", target: "7948de0e-9199-48c6-a371-0976c9b6d7f7", linkType: "cooccurrence", weight: 1, color: "#ffd700" } },
+    { data: { id: "e7", source: "75e35b40-db12-457b-950d-bf865d7b54f7", target: "7948de0e-9199-48c6-a371-0976c9b6d7f7", linkType: "cooccurrence", weight: 1, color: "#ffd700" } },
+    { data: { id: "e8", source: "75e35b40-db12-457b-950d-bf865d7b54f7", target: "b2d8fc9a-1cc4-4038-a0d7-34170c18f176", linkType: "cooccurrence", weight: 1, color: "#ffd700" } },
+    { data: { id: "e9", source: "1c6a04de-e872-4b0b-b00d-a4d3c96e0faa", target: "75e35b40-db12-457b-950d-bf865d7b54f7", linkType: "cooccurrence", weight: 1, color: "#ffd700" } },
+    { data: { id: "e10", source: "7948de0e-9199-48c6-a371-0976c9b6d7f7", target: "b2d8fc9a-1cc4-4038-a0d7-34170c18f176", linkType: "cooccurrence", weight: 1, color: "#ffd700" } }
   ]
 };
 
@@ -81,28 +86,33 @@ function MemoryForceGraph({ graphData, onSelectNode, selectedNodeId }) {
 
   // Initialize node layout positions
   useEffect(() => {
-    if (!graphData || !graphData.nodes) return;
+    if (!graphData) return;
+
+    const normalized = normalizeGraphData(graphData);
+    if (!normalized.nodes || normalized.nodes.length === 0) return;
 
     const width = 640;
     const height = 340;
 
-    const localNodes = graphData.nodes.map((n, i) => {
-      const angle = (i / graphData.nodes.length) * Math.PI * 2;
+    const localNodes = normalized.nodes.map((n, i) => {
+      const angle = (i / normalized.nodes.length) * Math.PI * 2;
       const radius = 90 + Math.random() * 60;
       return {
         id: n.id,
-        label: n.label || "Entity",
+        label: n.label,
+        displayLabel: n.displayLabel,
+        color: n.color,
         properties: n.properties || {},
         x: width / 2 + Math.cos(angle) * radius,
         y: height / 2 + Math.sin(angle) * radius,
         vx: 0,
         vy: 0,
-        radius: n.label === "Company" ? 32 : 24
+        radius: (n.mentionCount && n.mentionCount > 1) || n.label === "Company" ? 32 : 25
       };
     });
 
     setNodes(localNodes);
-    setEdges(graphData.edges || []);
+    setEdges(normalized.edges || []);
   }, [graphData]);
 
   // Force-directed physics loop
@@ -234,8 +244,8 @@ function MemoryForceGraph({ graphData, onSelectNode, selectedNodeId }) {
         ctx.beginPath();
         ctx.moveTo(sourceNode.x, sourceNode.y);
         ctx.lineTo(targetNode.x, targetNode.y);
-        ctx.strokeStyle = "rgba(181, 137, 0, 0.5)";
-        ctx.lineWidth = 2;
+        ctx.strokeStyle = edge.color || "rgba(181, 137, 0, 0.5)";
+        ctx.lineWidth = Math.max(1.5, edge.weight || 1);
         ctx.stroke();
 
         const midX = (sourceNode.x + targetNode.x) / 2;
@@ -247,17 +257,19 @@ function MemoryForceGraph({ graphData, onSelectNode, selectedNodeId }) {
       }
     });
 
-    // Draw Nodes with specific category palette
+    // Draw Nodes with specific category palette or custom backend node color
     nodes.forEach((node) => {
       ctx.beginPath();
       ctx.arc(node.x, node.y, node.radius, 0, Math.PI * 2);
 
-      let color = "#b58900"; // Default Gold
-      if (node.label === "Company") color = "#cb4b16"; // Orange
-      else if (node.label === "Customer") color = "#859900"; // Green
-      else if (node.label === "Investor") color = "#b58900"; // Gold
-      else if (node.label === "Tool") color = "#268bd2"; // Blue
-      else if (node.label === "Founder") color = "#d33682"; // Magenta
+      let color = node.color || "#b58900"; // Default Gold or node.color
+      if (!node.color) {
+        if (node.label === "Company") color = "#cb4b16"; // Orange
+        else if (node.label === "Customer") color = "#859900"; // Green
+        else if (node.label === "Investor") color = "#b58900"; // Gold
+        else if (node.label === "Tool") color = "#268bd2"; // Blue
+        else if (node.label === "Founder") color = "#d33682"; // Magenta
+      }
 
       ctx.fillStyle = color;
       ctx.fill();
@@ -272,16 +284,19 @@ function MemoryForceGraph({ graphData, onSelectNode, selectedNodeId }) {
         ctx.stroke();
       }
 
-      ctx.fillStyle = "#fdf6e3";
+      ctx.fillStyle = "#111827";
       ctx.font = "bold 10px monospace";
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-      const displayTitle = node.id.length > 12 ? `${node.id.substring(0, 10)}..` : node.id;
-      ctx.fillText(displayTitle, node.x, node.y - 3);
+      const nameToShow = node.displayLabel || node.label || node.id;
+      const displayTitle = nameToShow.length > 14 ? `${nameToShow.substring(0, 12)}..` : nameToShow;
+      ctx.fillText(displayTitle, node.x, node.y - 2);
 
-      ctx.fillStyle = "rgba(253, 246, 227, 0.85)";
-      ctx.font = "8px monospace";
-      ctx.fillText(node.label, node.x, node.y + 7);
+      if (node.label && node.label !== nameToShow) {
+        ctx.fillStyle = "rgba(17, 24, 39, 0.75)";
+        ctx.font = "8px monospace";
+        ctx.fillText(node.label, node.x, node.y + 7);
+      }
     });
   }, [nodes, edges, selectedNodeId]);
 

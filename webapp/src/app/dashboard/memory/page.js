@@ -36,29 +36,50 @@ function ForceGraph({ graphData }) {
 
   // Initialize nodes and edges
   useEffect(() => {
-    if (!graphData || !graphData.nodes) return;
+    if (!graphData) return;
+
+    const target = graphData.graph || graphData;
+    const rawNodes = target.nodes || [];
+    const rawEdges = target.edges || [];
+
+    if (rawNodes.length === 0) return;
 
     const width = 800;
     const height = 450;
 
-    // Map graph data to local node representation with random positions around the center
-    const localNodes = graphData.nodes.map((n, i) => {
-      const angle = (i / graphData.nodes.length) * Math.PI * 2;
+    const localNodes = rawNodes.map((n, i) => {
+      const data = n.data || n;
+      const label = data.label || data.name || data.id || "Entity";
+      const angle = (i / rawNodes.length) * Math.PI * 2;
       const radius = 100 + Math.random() * 100;
       return {
-        id: n.id,
-        label: n.label,
-        properties: n.properties || {},
+        id: data.id || label,
+        label: label,
+        displayLabel: label,
+        color: data.color || n.color,
+        properties: data.properties || { mentionCount: data.mentionCount || 1, color: data.color },
         x: width / 2 + Math.cos(angle) * radius,
         y: height / 2 + Math.sin(angle) * radius,
         vx: 0,
         vy: 0,
-        radius: n.label === "Company" ? 35 : 25,
+        radius: (data.mentionCount && data.mentionCount > 1) || label === "Company" ? 35 : 26,
+      };
+    });
+
+    const localEdges = rawEdges.map((e) => {
+      const data = e.data || e;
+      return {
+        id: data.id || `${data.source}-${data.target}`,
+        source: data.source || e.source,
+        target: data.target || e.target,
+        type: data.linkType || data.type || e.type || "cooccurrence",
+        weight: data.weight || e.weight || 1,
+        color: data.color || e.color || "#ffd700",
       };
     });
 
     setNodes(localNodes);
-    setEdges(graphData.edges || []);
+    setEdges(localEdges);
   }, [graphData]);
 
   // Force-directed physics loop

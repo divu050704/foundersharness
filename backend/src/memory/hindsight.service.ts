@@ -19,4 +19,17 @@ export class HindsightService {
       },
     );
   }
+  async getEntityGraph(email: string) {
+    const bankId = `user:${email}`;
+    const res = await fetch(
+      `${process.env.HINDSIGHT_URL!}/v1/default/banks/${bankId}/entities/graph?limit=1000`
+    );
+    if (!res.ok) throw new Error(`Graph fetch failed: ${res.status}`);
+    return res.json() as Promise<{
+      nodes: { data: { id: string; label: string; mentionCount: number; color: string } }[];
+      edges: { data: { source: string; target: string; weight: number; id: string } }[];
+      total_entities: number;
+      total_edges: number;
+    }>;
+  }
 }

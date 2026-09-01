@@ -145,7 +145,7 @@ export default function LeanCanvasView({
           <div className="flex items-center gap-2">
             <Sparkles className="size-4 text-primary animate-pulse" />
             <span className="font-pixel text-[10px] tracking-widest text-[#f59e0b] uppercase">
-              MUNDER DIFFLIN // LEAN CANVAS BLUEPRINT
+              FOUNDER HARNESS // LEAN CANVAS BLUEPRINT
             </span>
           </div>
           <h1 className="font-sans font-bold text-3xl tracking-tight text-foreground">

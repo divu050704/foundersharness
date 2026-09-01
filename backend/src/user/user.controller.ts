@@ -2,12 +2,14 @@ import { Controller, Get, Redirect, Post, Body } from '@nestjs/common';
 import { Session } from '@thallesp/nestjs-better-auth';
 import type { UserSession } from '@thallesp/nestjs-better-auth';
 import { UserService } from './user.service';
+import { HindsightService } from '../memory/hindsight.service';
 
 
 @Controller('user')
 export class UserController {
     constructor(
         private readonly userService: UserService,
+        private readonly hindsightService: HindsightService
     ) { }
     @Get()
     @Redirect()
@@ -28,10 +30,10 @@ export class UserController {
         return { exists, email: email || null };
     }
 
-    // @Get("memory")
-    // async getMemoryGraph(@Session() session: UserSession) {
-    //     const email = session?.user?.email || "";
-    //     const graph = await this.neo4jStore.getGraph(email);
-    //     return { graph: graph };
-    // }
+    @Get("memory")
+    async getMemoryGraph(@Session() session: UserSession) {
+        const email = session?.user?.email || "";
+        const graph = await this.hindsightService.getEntityGraph(email)
+        return { graph: graph };
+    }
 }

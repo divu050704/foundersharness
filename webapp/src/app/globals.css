@@ -100,7 +100,7 @@
 }
 
 .dark {
-  /* Dark Mode - Retro Munder-Difflin Terminal */
+  /* Dark Mode - Retro Founder Harness Terminal */
   --background: #0f1419;
   --foreground: #f3f4f6;
   --card: #19222d;
@@ -158,7 +158,7 @@
   }
 }
 
-/* Custom Munder Difflin Pixel Art Styles */
+/* Custom Founder Harness Pixel Art Styles */
 .font-pixel {
   font-family: 'Press Start 2P', cursive, monospace;
 }

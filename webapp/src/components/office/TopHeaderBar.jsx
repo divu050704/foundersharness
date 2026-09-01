@@ -15,12 +15,12 @@ export default function TopHeaderBar({
       {/* Brand Title */}
       <div className="flex items-center gap-3">
         <div className="size-8 rounded bg-[#b58900] border border-[#b58900] flex items-center justify-center font-pixel text-[#fdf6e3] text-xs font-bold shadow">
-          MD
+          FH
         </div>
         <div>
           <div className="flex items-center gap-2">
             <h1 className="font-pixel text-xs text-[#073642] font-bold uppercase tracking-wide">
-              MUNDER DIFFLIN HQ
+              FOUNDER HARNESS HQ
             </h1>
             <span className="bg-[#859900]/20 text-[#859900] border border-[#859900]/40 text-[9px] px-1.5 py-0.5 rounded font-pixel font-bold">
               ● 8 AGENTS ONLINE

@@ -48,7 +48,7 @@ export default function Sidebar() {
 
   return (
     <div className="flex h-full w-64 flex-col border-r border-border bg-card text-card-foreground font-mono">
-      {/* Brand Header with Dunder Mifflin / Munder Difflin Style */}
+      {/* Brand Header with Founder Harness Style */}
       <div className="flex flex-col justify-center px-6 py-4 border-b border-border bg-card">
         <Link
           href="/dashboard"
@@ -56,14 +56,14 @@ export default function Sidebar() {
           className="flex items-center gap-2 font-semibold"
         >
           <div className="size-7 rounded bg-amber-500/20 border border-amber-500 flex items-center justify-center font-pixel text-amber-500 text-xs shadow">
-            MD
+            FH
           </div>
           <div className="flex flex-col">
             <span className="text-xs font-pixel tracking-wider text-foreground uppercase">
-              Munder Difflin
+              Founder Harness
             </span>
             <span className="text-[9px] font-mono text-amber-500/90 font-bold uppercase tracking-widest">
-              Paper Co. & Multi-Agent HQ
+              Multi-Agent AI HQ
             </span>
           </div>
         </Link>

@@ -1,4 +1,4 @@
-// Web Audio API Retro Sound Effects Synthesizer for Munder-Difflin UI
+// Web Audio API Retro Sound Effects Synthesizer for Founder Harness UI
 
 let audioCtx = null;
 let soundEnabled = true;

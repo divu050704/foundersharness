@@ -7,6 +7,99 @@ import { sendEmailToAgent } from "@/lib/emailAgentService";
 import { api } from "@/lib/api";
 import PixelHumanFigure from "./PixelHumanFigure";
 
+export function formatEmailDate(dateInput) {
+  if (!dateInput) return "Today";
+  const date = new Date(dateInput);
+  if (isNaN(date.getTime())) return "Today";
+
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const target = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+
+  const diffTime = today.getTime() - target.getTime();
+  const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+
+  if (diffDays <= 0) {
+    return "Today";
+  } else if (diffDays === 1) {
+    return "Yesterday";
+  } else if (diffDays === 2) {
+    return "2 days ago";
+  } else {
+    return date.toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: date.getFullYear() !== now.getFullYear() ? "numeric" : undefined,
+    });
+  }
+}
+
+const getInitialEmails = () => {
+  const now = new Date();
+  const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+  const twoDaysAgo = new Date(now.getTime() - 2 * 24 * 60 * 60 * 1000);
+  const fiveDaysAgo = new Date(now.getTime() - 5 * 24 * 60 * 60 * 1000);
+
+  return [
+    {
+      id: "demo-1",
+      agentId: "pam",
+      sender: "Pamela Miller",
+      senderEmail: "pamela.miller@foundersharness.ai",
+      receiver: "Marcus Scott",
+      role: "Social Media Calendar Builder",
+      subject: "LinkedIn & X Content Batch Approved",
+      createdAt: now,
+      time: now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+      unread: false,
+      body: "Hi Marcus,\n\nI've generated and scheduled 14 social media posts for the week across LinkedIn and X via CDP browser automation. All posts pass brand guidelines.",
+      attachments: ["weekly_social_schedule.json"],
+    },
+    {
+      id: "demo-2",
+      agentId: "dwight",
+      sender: "Derrick Vance",
+      senderEmail: "derrick.vance@foundersharness.ai",
+      receiver: "Marcus Scott",
+      role: "Capital & Grants Scout",
+      subject: "NSF SBIR Phase I Grant Opportunity Identified",
+      createdAt: yesterday,
+      time: "04:15 PM",
+      unread: false,
+      body: "NSF SBIR Phase I non-dilutive grant deadline is approaching. $275k funding limit with 0% equity dilution.\n\nI have prepared the draft application materials.",
+      attachments: ["nsf_sbir_grant_proposal.pdf"],
+    },
+    {
+      id: "demo-3",
+      agentId: "jim",
+      sender: "Jimmy Harper",
+      senderEmail: "jimmy.harper@foundersharness.ai",
+      receiver: "Marcus Scott",
+      role: "Lead Systems Architect & Code Refactoring",
+      subject: "Micro-frontends & API Gateway Sync Complete",
+      createdAt: twoDaysAgo,
+      time: "11:30 AM",
+      unread: false,
+      body: "Hey Marcus,\n\nRefactored the API routes and added retry logic for subagent execution. Zero breaking changes in production.",
+      attachments: [],
+    },
+    {
+      id: "demo-4",
+      agentId: "stanley",
+      sender: "Stan Hayes",
+      senderEmail: "stan.hayes@foundersharness.ai",
+      receiver: "Marcus Scott",
+      role: "Deep Work Focus & Security Firewall Guard",
+      subject: "Cross-Words & Security Audit Report",
+      createdAt: fiveDaysAgo,
+      time: "09:05 AM",
+      unread: false,
+      body: "Security audit is green. Firewalls configured and rate limiting enforced for all CLI agent sub-processes.",
+      attachments: ["firewall_audit_log.txt"],
+    },
+  ];
+};
+
 export default function MichaelScottOSModal({
   agents,
   onClose,
@@ -14,7 +107,7 @@ export default function MichaelScottOSModal({
   onUpdateAgent,
 }) {
   const [activeApp, setActiveApp] = useState("email"); // "email" | "tasks" | "notes" | "mempalace"
-  const [selectedEmailId, setSelectedEmailId] = useState("");
+  const [selectedEmailId, setSelectedEmailId] = useState("demo-1");
   const [recipientEmail, setRecipientEmail] = useState("");
   const [selectedAgentId, setSelectedAgentId] = useState("");
   const [emailSubject, setEmailSubject] = useState("");
@@ -22,7 +115,7 @@ export default function MichaelScottOSModal({
   const [emailAttachments, setEmailAttachments] = useState("");
   const [sentNotification, setSentNotification] = useState("");
   const [showSuggestions, setShowSuggestions] = useState(false);
-  const [emails, setEmails] = useState([]);
+  const [emails, setEmails] = useState(getInitialEmails);
 
   // Fetch threads from backend DB on mount
   useEffect(() => {
@@ -36,17 +129,17 @@ export default function MichaelScottOSModal({
               const matchingAgent = agents.find(
                 (a) => a.email === email.receiver || a.email === email.sender
               );
+              const createdAt = email.createdAt ? new Date(email.createdAt) : new Date();
               return {
                 id: thread._id ? `${thread._id}-${idx}` : `thread-${Date.now()}-${idx}`,
                 agentId: matchingAgent?.id || "agent",
-                sender: email.sender || "Founder / Michael Scott",
-                senderEmail: email.sender || "michael.scott@dundermifflin.com",
+                sender: email.sender || "Founder / Marcus Scott",
+                senderEmail: email.sender || "marcus.scott@foundersharness.ai",
                 receiver: email.receiver || matchingAgent?.email || "",
                 role: matchingAgent?.officeRole || "Agent",
                 subject: subject,
-                time: email.createdAt
-                  ? new Date(email.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
-                  : new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+                createdAt: createdAt,
+                time: createdAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
                 unread: false,
                 body: email.content || "",
                 attachments: email.attachments || [],
@@ -93,11 +186,12 @@ export default function MichaelScottOSModal({
 
     const subjectText = emailSubject.trim() || "New Task Instruction";
     const targetEmail = recipientEmail.trim();
+    const now = new Date();
 
-    if (targetEmail.toLowerCase() === "all" || targetEmail.toLowerCase() === "all.agents@dundermifflin.com") {
+    if (targetEmail.toLowerCase() === "all" || targetEmail.toLowerCase() === "all.agents@foundersharness.ai") {
       const newThreads = [];
       for (const agent of agents) {
-        const receiverEmail = agent.email || `${agent.id}@dundermifflin.com`;
+        const receiverEmail = agent.email || `${agent.id}@foundersharness.ai`;
 
         sendEmailToAgent({
           receiver: receiverEmail,
@@ -107,14 +201,15 @@ export default function MichaelScottOSModal({
         });
 
         newThreads.push({
-          id: `thread-${Date.now()}-${agent.id}`,
+          id: `thread-${now.getTime()}-${agent.id}`,
           agentId: agent.id,
-          sender: "Founder / Michael Scott",
-          senderEmail: "michael.scott@dundermifflin.com",
+          sender: "Founder / Marcus Scott",
+          senderEmail: "marcus.scott@foundersharness.ai",
           receiver: receiverEmail,
           role: agent.officeRole,
           subject: `[Broadcast] ${subjectText}`,
-          time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+          createdAt: now,
+          time: now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
           unread: false,
           body: emailBody,
           attachments: attachmentList,
@@ -143,14 +238,15 @@ export default function MichaelScottOSModal({
       });
 
       const newThread = {
-        id: `thread-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`,
+        id: `thread-${now.getTime()}-${Math.random().toString(36).substr(2, 5)}`,
         agentId: targetAgentObj?.id || "agent",
-        sender: "Founder / Michael Scott",
-        senderEmail: "michael.scott@dundermifflin.com",
+        sender: "Founder / Marcus Scott",
+        senderEmail: "marcus.scott@foundersharness.ai",
         receiver: targetEmail,
         role: targetAgentObj?.officeRole || "Agent",
         subject: subjectText,
-        time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+        createdAt: now,
+        time: now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
         unread: false,
         body: emailBody,
         attachments: attachmentList,
@@ -189,7 +285,7 @@ export default function MichaelScottOSModal({
               title="CRT Power LED"
             />
             <span className="font-pixel text-xs text-[#222] font-bold tracking-widest uppercase">
-              MUNDER DIFFLIN 1998 TRINITRON CRT MONITOR — EXECUTIVE OS v4.2
+              FOUNDER HARNESS 1998 TRINITRON CRT MONITOR — EXECUTIVE OS v4.2
             </span>
           </div>
 
@@ -234,7 +330,7 @@ export default function MichaelScottOSModal({
                 }`}
               >
                 <Mail className="size-3.5 text-amber-300" />
-                <span>MunderMail XP</span>
+                <span>FounderMail XP</span>
               </button>
 
               <button
@@ -271,7 +367,7 @@ export default function MichaelScottOSModal({
                   📧
                 </div>
                 <span className="text-center shadow-black drop-shadow">
-                  MunderMail XP
+                  FounderMail XP
                 </span>
               </button>
 
@@ -318,7 +414,7 @@ export default function MichaelScottOSModal({
                   )}
                   <span className="font-bold uppercase">
                     {activeApp === "email" &&
-                      "MunderMail XP v4.2 — Michael Scott Executive Inbox"}
+                      "FounderMail XP v4.2 — Michael Scott Executive Inbox"}
                     {activeApp === "tasks" &&
                       "Executive Agent Fleet Task Manager"}
                     {activeApp === "notes" &&
@@ -351,7 +447,7 @@ export default function MichaelScottOSModal({
 
               {/* WINDOW INNER CONTENT BODY */}
               <div className="flex-1 p-3 overflow-hidden bg-[#ece9d8]">
-                {/* APP 1: MUNDERMAIL XP (EMAIL CLIENT TO ALL AGENTS) */}
+                {/* APP 1: FOUNDERMAIL XP (EMAIL CLIENT TO ALL AGENTS) */}
                 {activeApp === "email" && (
                   <div className="h-full flex flex-col lg:flex-row gap-3 overflow-hidden">
                     {/* Left: Email Inbox List */}
@@ -389,16 +485,16 @@ export default function MichaelScottOSModal({
                                     : "bg-[#f8f9fa] hover:bg-[#ece9d8] text-[#222] border-[#ccd]"
                                 }`}
                               >
-                                <div className="flex items-center justify-between text-[10px] font-bold">
+                                <div className="flex items-center justify-between text-[10px] font-bold gap-1">
                                   <span className="truncate">{item.sender}</span>
                                   <span
-                                    className={
+                                    className={`shrink-0 text-[9px] ${
                                       isSelected
                                         ? "text-amber-200"
                                         : "text-slate-500"
-                                    }
+                                    }`}
                                   >
-                                    {item.time}
+                                    {formatEmailDate(item.createdAt)} • {item.time}
                                   </span>
                                 </div>
                                 <div
@@ -426,7 +522,7 @@ export default function MichaelScottOSModal({
                                 {selectedEmail.subject}
                               </h4>
                               <span className="text-[10px] text-slate-500 font-bold">
-                                Received: {selectedEmail.time}
+                                Received: {formatEmailDate(selectedEmail.createdAt)} at {selectedEmail.time}
                               </span>
                             </div>
                             <div className="text-[11px] text-slate-700 mt-1 font-bold flex flex-wrap justify-between gap-1">
@@ -652,7 +748,7 @@ export default function MichaelScottOSModal({
                       📝 NOTEPAD XP — FOUNDER DAY STRATEGY
                     </div>
                     <textarea
-                      defaultValue={`MUNDER DIFFLIN FOUNDER ROADMAP & DAY PLAN:\n\n1. Social Media: Pam & Jim batch 14 posts via CDP browser session.\n2. Grants & Capital: Dwight crawling NSF & SBIR non-dilutive grants.\n3. Focus Time: Stanley protecting 4-hour deep work coding block.\n4. Events & Safety: Ryan & Toby checking local demo nights and API rate limits.`}
+                      defaultValue={`FOUNDER HARNESS ROADMAP & DAY PLAN:\n\n1. Social Media: Pam & Jim batch 14 posts via CDP browser session.\n2. Grants & Capital: Dwight crawling NSF & SBIR non-dilutive grants.\n3. Focus Time: Stanley protecting 4-hour deep work coding block.\n4. Events & Safety: Ryan & Toby checking local demo nights and API rate limits.`}
                       className="flex-1 w-full p-3 font-mono text-xs text-slate-800 border border-[#eee] rounded resize-none focus:outline-none leading-relaxed"
                     />
                   </div>

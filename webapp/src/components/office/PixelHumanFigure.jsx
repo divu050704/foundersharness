@@ -1,6 +1,6 @@
 "use client";
 
-// Custom Pixel-Art Human Sprite Character Renderer for Munder-Difflin Agents
+// Custom Pixel-Art Human Sprite Character Renderer for Founder Harness Agents
 
 export default function PixelHumanFigure({ agentId, size = "md", isWorking = false }) {
   const sizeClasses = {

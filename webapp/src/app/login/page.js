@@ -61,14 +61,14 @@ export default function LoginPage() {
           <div className="border-b-2 border-[#2e3e50] pb-4 space-y-2">
             <div className="flex items-center gap-3">
               <div className="size-10 rounded bg-[#f59e0b]/20 border-2 border-[#f59e0b] flex items-center justify-center font-pixel text-[#f59e0b] text-sm shadow">
-                MD
+                FH
               </div>
               <div>
                 <h1 className="font-pixel text-lg text-[#f3f4f6] uppercase tracking-wide">
-                  MUNDER DIFFLIN
+                  FOUNDER HARNESS
                 </h1>
                 <p className="text-xs text-[#f59e0b] font-mono font-bold tracking-wider uppercase">
-                  Paper Co. & Founder Harness HQ
+                  Multi-Agent AI HQ
                 </p>
               </div>
             </div>
@@ -188,7 +188,7 @@ export default function LoginPage() {
         <div className="z-10 flex items-center justify-between border-b border-[#2e3e50] pb-4">
           <div className="flex items-center gap-2 font-pixel text-xs text-[#f59e0b]">
             <Terminal className="size-4" />
-            <span>MUNDER DIFFLIN FOUNDER HARNESS SQUAD</span>
+            <span>FOUNDER HARNESS SQUAD</span>
           </div>
           <span className="text-xs font-mono text-slate-400">8 Autonomous CLI Agents</span>
         </div>

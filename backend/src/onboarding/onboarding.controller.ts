@@ -10,7 +10,6 @@ import { OnboardingService } from './onboarding.service';
 import { CreateOnboardingDto } from './dto/create-onboarding.dto';
 import type { LeanCanvasOutput } from '../agents/schema';
 import type { UserSession } from '@thallesp/nestjs-better-auth';
-import { EntityExtractorOutput } from '../agents/schema';
 
 @Controller('onboarding')
 export class OnboardingController {
@@ -25,10 +24,9 @@ export class OnboardingController {
   @Post("extract")
   @HttpCode(HttpStatus.CREATED)
   async extract(@Body() canvas: LeanCanvasOutput, @Session() session: UserSession) {
-    const extractedFeatures  = await this.onboardingService.saveMemory(canvas, session.user.email)
-
-    await this.onboardingService.generateEmails(extractedFeatures, session.user.email)
-
+    await this.onboardingService.saveMemory(canvas, session.user.email)
+    await this.onboardingService.generateEmails(canvas, session.user.email)
+    return {success: true, message: "Memory created and saved successfully"}
   }
 
 }
