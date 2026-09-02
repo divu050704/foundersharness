@@ -1,5 +1,19 @@
 <img width="1280" height="720" alt="FH" src="https://github.com/user-attachments/assets/6072d146-e449-4a85-93f0-fe6c70f5c23b" />
 
+<p align="center">
+  <img src="https://img.shields.io/badge/NestJS-E0234E?style=for-the-badge&logo=nestjs&logoColor=white" alt="NestJS" />
+  <img src="https://img.shields.io/badge/Next.js-000000?style=for-the-badge&logo=nextdotjs&logoColor=white" alt="Next.js" />
+  <img src="https://img.shields.io/badge/React_19-20232A?style=for-the-badge&logo=react&logoColor=61DAFB" alt="React" />
+  <img src="https://img.shields.io/badge/TypeScript-3178C6?style=for-the-badge&logo=typescript&logoColor=white" alt="TypeScript" />
+  <img src="https://img.shields.io/badge/LangChain-1C3C3C?style=for-the-badge&logo=langchain&logoColor=white" alt="LangChain" />
+  <img src="https://img.shields.io/badge/Google_Gemini-8E75B2?style=for-the-badge&logo=googlegemini&logoColor=white" alt="Google Gemini" />
+  <img src="https://img.shields.io/badge/Hindsight_Memory-6C5CE7?style=for-the-badge" alt="Hindsight Memory" />
+  <img src="https://img.shields.io/badge/.NET_8-512BD4?style=for-the-badge&logo=dotnet&logoColor=white" alt=".NET 8" />
+  <img src="https://img.shields.io/badge/Playwright-2EAD33?style=for-the-badge&logo=playwright&logoColor=white" alt="Playwright" />
+  <img src="https://img.shields.io/badge/MongoDB-47A248?style=for-the-badge&logo=mongodb&logoColor=white" alt="MongoDB" />
+  <img src="https://img.shields.io/badge/Redis-DC382D?style=for-the-badge&logo=redis&logoColor=white" alt="Redis" />
+</p>
+
 **Founders Harness** is an autonomous AI Founder OS and multi-agent executive team platform. It empowers solo founders and startup teams by deploying specialized, autonomous AI agents (such as social media strategists, capital scouts, stealth browser specialists, and day planners) equipped with persistent long-term memory, real-time browser execution capabilities, and interactive web/desktop controls.
 
 Unlike traditional agent platforms or AI harnesses that require connecting external third-party services, managing complex OAuth tokens, or paying for cloud browser APIs, Founders Harness leverages the user's active browser session directly as an execution sandbox via an on-device Playwright bridge—allowing agents to scout, crawl, and automate actions natively without requiring service connection setups.
