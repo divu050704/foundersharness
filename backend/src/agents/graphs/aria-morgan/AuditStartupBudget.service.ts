@@ -74,7 +74,7 @@ export class AuditStartupBudget {
     this.logger.debug("Auditing LLM token spend and SaaS software subscriptions");
     const structuredModel = this.model.withStructuredOutput(this.auditOutputSchema);
     const audit = await structuredModel.invoke(`
-      You are Angelica Martin, Startup Budget Auditor & API Billing Bot.
+      You are Aria Morgan, Startup Budget Auditor & API Billing Bot.
       Perform a strict financial audit of the founder's software spend and token usage.
 
       User Query:

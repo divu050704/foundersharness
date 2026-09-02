@@ -7,7 +7,7 @@ import { playRetroSound } from "@/lib/retroAudio";
 
 export default function RightAgentPanel({ agent, onUpdateAgent, onDispatchTask }) {
   const [customPrompt, setCustomPrompt] = useState("");
-  const [selectedModel, setSelectedModel] = useState(agent?.aiModel || "Claude 3.7 Sonnet");
+  const [selectedModel, setSelectedModel] = useState(agent?.aiModel || "Orchestrator Core");
 
   if (!agent) {
     return (
@@ -27,13 +27,13 @@ export default function RightAgentPanel({ agent, onUpdateAgent, onDispatchTask }
     setCustomPrompt("");
   };
 
-  const handleRewardDundie = () => {
+  const handleRewardAchievement = () => {
     playRetroSound("chime");
     onUpdateAgent(agent.id, {
-      dundieScore: agent.dundieScore + 50,
+      achievementScore: agent.achievementScore + 50,
       logs: [
         ...agent.logs,
-        `[DUNDIE] Received +50 Dundie points from Founder! New score: ${agent.dundieScore + 50}`
+        `[ACHIEVEMENT] Received +50 Achievement points from Founder! New score: ${agent.achievementScore + 50}`
       ]
     });
   };
@@ -87,7 +87,7 @@ export default function RightAgentPanel({ agent, onUpdateAgent, onDispatchTask }
           <div>
             <div className="flex items-center gap-2">
               <h3 className="font-pixel text-sm text-[#073642] font-bold">{agent.name}</h3>
-              {agent.id === "michael" && <span title="God Agent Presiding">👑</span>}
+              {agent.id === "alex" && <span title="God Agent Presiding">👑</span>}
             </div>
             <p className="text-[11px] text-[#586e75] font-bold">{agent.officeRole}</p>
             <span className="text-[9px] font-pixel text-[#b58900] bg-[#b58900]/10 border border-[#b58900]/40 px-1.5 py-0.5 rounded mt-1 inline-block font-bold">
@@ -102,11 +102,11 @@ export default function RightAgentPanel({ agent, onUpdateAgent, onDispatchTask }
         <div className="flex items-center gap-2">
           <button
             type="button"
-            onClick={handleRewardDundie}
+            onClick={handleRewardAchievement}
             className="flex items-center gap-1 bg-[#b58900] text-[#fdf6e3] border border-[#b58900] hover:bg-[#a17a00] px-2 py-1 rounded font-pixel text-[9px] cursor-pointer font-bold"
           >
             <Award className="size-3" />
-            <span>+50 Dundie</span>
+            <span>+50 Achievement</span>
           </button>
 
           <button
@@ -124,12 +124,11 @@ export default function RightAgentPanel({ agent, onUpdateAgent, onDispatchTask }
           onChange={(e) => handleModelChange(e.target.value)}
           className="bg-[#fdf6e3] border border-[#b58900]/50 rounded text-[10px] px-2 py-1 font-mono text-[#073642] font-bold focus:outline-none focus:border-[#cb4b16] cursor-pointer"
         >
-          <option value="Claude 3.7 Sonnet">Claude 3.7 Sonnet</option>
-          <option value="Claude 3.5 Haiku">Claude 3.5 Haiku</option>
-          <option value="Grok-3 (Strict Enforcement)">Grok-3</option>
-          <option value="Gemini 2.5 Flash">Gemini 2.5 Flash</option>
-          <option value="DeepSeek R1 (Logic Master)">DeepSeek R1</option>
-          <option value="Llama 3.3 (Safety Checked)">Llama 3.3</option>
+          <option value="Orchestrator Core">Orchestrator Core</option>
+          <option value="High Performance Core">High Performance Core</option>
+          <option value="Fast Execution Core">Fast Execution Core</option>
+          <option value="Logic & Verification Core">Logic & Verification Core</option>
+          <option value="Safety & Compliance Core">Safety & Compliance Core</option>
         </select>
       </div>
 

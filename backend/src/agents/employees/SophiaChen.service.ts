@@ -1,6 +1,6 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
-import { GenerateSocialMediaCalendar } from "../graphs/pamela-miller/GenerateSocialMediaCalendar.service";
+import { GenerateSocialMediaCalendar } from "../graphs/sophia-chen/GenerateSocialMediaCalendar.service";
 import z from "zod";
 import { tool } from "@langchain/core/tools";
 import { HindsightService } from "../../memory/hindsight.service";
@@ -12,8 +12,8 @@ import { EmailThread } from "../schemas/email.schema";
 import { Model } from "mongoose";
 
 @Injectable()
-export class PamelaMillerService {
-  private readonly logger = new Logger(PamelaMillerService.name);
+export class SophiaChenService {
+  private readonly logger = new Logger(SophiaChenService.name);
 
   constructor(
     @InjectModel(EmailThread.name) private emailModel: Model<EmailThread>,
@@ -28,9 +28,9 @@ export class PamelaMillerService {
 
   createCalendarTool = tool(
     async ({ query, session }) => {
-      this.logger.debug("Extracting Knowledge for Pamela Miller");
+      this.logger.debug("Extracting Knowledge for Sophia Chen");
       const memories = await this.memory.recall(session, query);
-      this.logger.debug("Invoking Pamela Miller graph");
+      this.logger.debug("Invoking Sophia Chen graph");
 
       return await this.generateSocialMediaCalendar.graph.invoke({
         query,
@@ -45,7 +45,7 @@ export class PamelaMillerService {
 
         DO NOT call this tool for:
         - Casual conversation or small talk
-        - Questions about Pamela Miller or what Pamela can do
+        - Questions about Sophia Chen or what Sophia can do
         - General social media questions, advice, or explanations
         - Acknowledgements such as "Thanks", "Okay", or "Great"
       `,
@@ -59,7 +59,7 @@ export class PamelaMillerService {
   modelWithTools = this.model.bindTools([this.createCalendarTool]);
 
   async runModel(email: EmailAgentDTO, sender: string, previousContext?: string, currentThreadId?: string) {
-    const personality = AGENT_PERSONALITIES["pamela-miller"];
+    const personality = AGENT_PERSONALITIES["sophia-chen"];
 
     // Save user query in Hindsight only
     try {
@@ -67,7 +67,7 @@ export class PamelaMillerService {
         await this.hindsightService.retain(
           sender,
           email.content,
-          "User Email Query & Preference for Pamela Miller"
+          "User Email Query & Preference for Sophia Chen"
         );
       }
     } catch (e) {
@@ -83,7 +83,7 @@ export class PamelaMillerService {
     } catch (_e) {}
 
     const prompt = `
-      You are Pamela Miller, an AI social media strategist.
+      You are Sophia Chen, an AI social media strategist.
 
       PERSONALITY:
       ${personality.personalitySummary}
@@ -126,7 +126,7 @@ export class PamelaMillerService {
           type: "social-media-calendar",
           content: graphResult?.posts ?? [],
           summary: `Posts calendar created based on user query: ${graphResult?.query ?? email.content}`,
-          producedBy: "pamela-miller",
+          producedBy: "sophia-chen",
         });
       }
     }
@@ -134,7 +134,7 @@ export class PamelaMillerService {
     let finalPrompt: string;
     if (toolResult) {
       finalPrompt = `
-        You are Pamela Miller, an AI social media strategist.
+        You are Sophia Chen, an AI social media strategist.
         Write a concise, warm email reply summarizing the completed social media calendar work.
 
         USER REQUEST: ${email.content}
@@ -149,7 +149,7 @@ export class PamelaMillerService {
       `;
     } else {
       finalPrompt = `
-        You are Pamela Miller, an AI social media strategist.
+        You are Sophia Chen, an AI social media strategist.
         Write a natural, friendly email reply to the user's request.
 
         IMPORTANT:

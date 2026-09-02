@@ -8,7 +8,7 @@ export default function OfficeFloorMap({
   onSelectAgent,
   onOpenConference,
   onTriggerCoffee,
-  onOpenDundies
+  onOpenAchievements
 }) {
   return (
     <div className="w-full h-full flex flex-col bg-[#0c0f12] select-none font-mono">
@@ -20,7 +20,7 @@ export default function OfficeFloorMap({
           onSelectAgent={onSelectAgent}
           onOpenConference={onOpenConference}
           onTriggerCoffee={onTriggerCoffee}
-          onOpenDundies={onOpenDundies}
+          onOpenAchievements={onOpenAchievements}
         />
       </div>
     </div>

@@ -1,13 +1,13 @@
 import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { Logger } from '@nestjs/common';
 import { Job } from 'bullmq';
-import { PamelaMillerService } from './employees/PamelaMiller.service';
-import { DerrickVanceService } from './employees/DerrickVance.service';
-import { JimmyHarperService } from './employees/JimmyHarper.service';
-import { StanHayesService } from './employees/StanHayes.service';
-import { RoryHowardService } from './employees/RoryHoward.service';
-import { AngelicaMartinService } from './employees/AngelicaMartin.service';
-import { TobiasHendersonService } from './employees/TobiasHenderson.service';
+import { SophiaChenService } from './employees/SophiaChen.service';
+import { VictorStoneService } from './employees/VictorStone.service';
+import { LucasBennettService } from './employees/LucasBennett.service';
+import { SamuelCrossService } from './employees/SamuelCross.service';
+import { RomanColeService } from './employees/RomanCole.service';
+import { AriaMorganService } from './employees/AriaMorgan.service';
+import { TylerReedService } from './employees/TylerReed.service';
 import { AgentsService } from './agents.service';
 
 @Processor('agent-tasks')
@@ -15,13 +15,13 @@ export class AgentTaskProcessor extends WorkerHost {
   private readonly logger = new Logger(AgentTaskProcessor.name);
 
   constructor(
-    private readonly pamelaMiller: PamelaMillerService,
-    private readonly derrickVance: DerrickVanceService,
-    private readonly jimmyHarper: JimmyHarperService,
-    private readonly stanHayes: StanHayesService,
-    private readonly roryHoward: RoryHowardService,
-    private readonly angelicaMartin: AngelicaMartinService,
-    private readonly tobiasHenderson: TobiasHendersonService,
+    private readonly sophiaelaMiller: SophiaChenService,
+    private readonly derrickVance: VictorStoneService,
+    private readonly lucasmyHarper: LucasBennettService,
+    private readonly stanHayes: SamuelCrossService,
+    private readonly roryHoward: RomanColeService,
+    private readonly angelicaMartin: AriaMorganService,
+    private readonly tobiasHenderson: TylerReedService,
     private readonly agentsService: AgentsService,
   ) {
     super();
@@ -34,19 +34,19 @@ export class AgentTaskProcessor extends WorkerHost {
     let replyContent: any = null;
 
     try {
-      if (job.name === 'process-pamela-miller') {
-        replyContent = await this.pamelaMiller.runModel(email, sender, previousContext, currentThreadId);
-      } else if (job.name === 'process-derrick-vance') {
+      if (job.name === 'process-sophia-chen') {
+        replyContent = await this.sophiaelaMiller.runModel(email, sender, previousContext, currentThreadId);
+      } else if (job.name === 'process-victor-stone') {
         replyContent = await this.derrickVance.runModel(email, sender, previousContext, currentThreadId);
-      } else if (job.name === 'process-jimmy-harper') {
-        replyContent = await this.jimmyHarper.runModel(email, sender, previousContext, currentThreadId);
-      } else if (job.name === 'process-stan-hayes') {
+      } else if (job.name === 'process-lucas-bennett') {
+        replyContent = await this.lucasmyHarper.runModel(email, sender, previousContext, currentThreadId);
+      } else if (job.name === 'process-samuel-cross') {
         replyContent = await this.stanHayes.runModel(email, sender, previousContext, currentThreadId);
-      } else if (job.name === 'process-rory-howard') {
+      } else if (job.name === 'process-roman-cole') {
         replyContent = await this.roryHoward.runModel(email, sender, previousContext, currentThreadId);
-      } else if (job.name === 'process-angelica-martin') {
+      } else if (job.name === 'process-aria-morgan') {
         replyContent = await this.angelicaMartin.runModel(email, sender, previousContext, currentThreadId);
-      } else if (job.name === 'process-tobias-henderson') {
+      } else if (job.name === 'process-tyler-reed') {
         replyContent = await this.tobiasHenderson.runModel(email, sender, previousContext, currentThreadId);
       }
 

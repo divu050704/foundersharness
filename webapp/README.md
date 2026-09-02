@@ -8,9 +8,9 @@ The **Founders Harness Web Application** is a modern, responsive founder dashboa
 
 ### 🏢 Gamified Pixel Office Workspace
 - **Interactive Floor Map (`OfficeFloorMap`)**: Visual representation of your AI executive team working in a top-down retro office environment.
-- **Agent Sprites & Dock**: Click on AI employees (like Pamela Miller) to inspect their current status, recent outputs, assigned tasks, and personality traits.
+- **Agent Sprites & Dock**: Click on AI employees (like Sophia Chen) to inspect their current status, recent outputs, assigned tasks, and personality traits.
 - **God Agent Bar & Conference Room**: Manage team-wide multi-agent brainstorming sessions and global directives.
-- **Dundie Awards Tracker**: Fun achievement system recognizing milestone accomplishments across your startup journey.
+- **Achievement Awards Tracker**: Fun achievement system recognizing milestone accomplishments across your startup journey.
 
 ### 📋 Interactive Lean Canvas Onboarding
 - **Founder Questionnaire**: Dynamic multi-step wizard guiding founders through problem identification, solution validation, revenue model definition, and target customer profiling.
@@ -19,8 +19,8 @@ The **Founders Harness Web Application** is a modern, responsive founder dashboa
 ### 🧠 Hindsight Memory Knowledge Graph Viewer (`/dashboard/memory`)
 - **Visual Entity Graph**: Interactive node-and-edge visualization rendering your company's long-term memory graph (customer personas, product features, past decisions, market strategy).
 
-### 📅 Pamela Miller Social Media Hub (`/dashboard/social`)
-- **AI Content Calendar Generator**: Request multi-week, multi-platform social media calendars from Pamela Miller.
+### 📅 Sophia Chen Social Media Hub (`/dashboard/social`)
+- **AI Content Calendar Generator**: Request multi-week, multi-platform social media calendars from Sophia Chen.
 - **Post Preview & Management**: Review generated posts across Twitter/X, LinkedIn, Instagram, and Reddit formats before scheduling.
 
 ---
@@ -86,7 +86,7 @@ webapp/src/
 ├── app/
 │   ├── dashboard/            # Founder Executive Dashboard
 │   │   ├── memory/           # Memory Graph Viewer Page
-│   │   └── social/           # Pamela Miller Social Media Hub
+│   │   └── social/           # Sophia Chen Social Media Hub
 │   ├── login/                # Auth & Login Page
 │   ├── onboarding/           # Founder Lean Canvas Wizard
 │   └── page.js               # Root Landing / Office View

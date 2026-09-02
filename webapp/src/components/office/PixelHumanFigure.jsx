@@ -11,11 +11,11 @@ export default function PixelHumanFigure({ agentId, size = "md", isWorking = fal
 
   const currentSize = sizeClasses[size] || sizeClasses.md;
 
-  // Custom SVG Character Sprites for each Dunder Mifflin agent
+  // Custom SVG Character Sprites for each Founder Harness agent
   const renderCharacter = () => {
     switch (agentId) {
-      case "michael":
-        // Michael Scott: Dark hair, navy suit, white shirt, red tie
+      case "alex":
+        // Alex Rivera: Dark hair, navy suit, white shirt, red tie
         return (
           <svg viewBox="0 0 32 40" className="w-full h-full drop-shadow-md">
             {/* Hair */}
@@ -38,8 +38,8 @@ export default function PixelHumanFigure({ agentId, size = "md", isWorking = fal
           </svg>
         );
 
-      case "dwight":
-        // Dwight Schrute: Middle-part brown hair, mustard yellow shirt, brown tie, glasses
+      case "victor":
+        // Victor Stone: Middle-part brown hair, mustard yellow shirt, brown tie, glasses
         return (
           <svg viewBox="0 0 32 40" className="w-full h-full drop-shadow-md">
             {/* Center-part Hair */}
@@ -61,8 +61,8 @@ export default function PixelHumanFigure({ agentId, size = "md", isWorking = fal
           </svg>
         );
 
-      case "jim":
-        // Jim Halpert: Shaggy hair, light blue shirt, black tie
+      case "lucas":
+        // Lucas Bennett: Shaggy hair, light blue shirt, black tie
         return (
           <svg viewBox="0 0 32 40" className="w-full h-full drop-shadow-md">
             {/* Shaggy Brown Hair */}
@@ -73,7 +73,7 @@ export default function PixelHumanFigure({ agentId, size = "md", isWorking = fal
             {/* Eyes looking sideways */}
             <circle cx="12" cy="13" r="1" fill="#1c1917" />
             <circle cx="18" cy="13" r="1" fill="#1c1917" />
-            {/* Jim Smirk */}
+            {/* Lucas Smirk */}
             <path d="M13 16 Q17 18 19 15" stroke="#9a3412" strokeWidth="1" fill="none" />
             {/* Light Blue Shirt & Dark Tie */}
             <path d="M9 19 L23 19 L25 36 L7 36 Z" fill="#38bdf8" />
@@ -84,8 +84,8 @@ export default function PixelHumanFigure({ agentId, size = "md", isWorking = fal
           </svg>
         );
 
-      case "pam":
-        // Pam Beesly: Wavy reddish hair, pink cardigan
+      case "sophia":
+        // Sophia Chen: Wavy reddish hair, pink cardigan
         return (
           <svg viewBox="0 0 32 40" className="w-full h-full drop-shadow-md">
             {/* Wavy Red-Brown Hair */}
@@ -106,8 +106,8 @@ export default function PixelHumanFigure({ agentId, size = "md", isWorking = fal
           </svg>
         );
 
-      case "ryan":
-        // Ryan Howard: Dark hair, black vest over white shirt
+      case "roman":
+        // Roman Cole: Dark hair, black vest over white shirt
         return (
           <svg viewBox="0 0 32 40" className="w-full h-full drop-shadow-md">
             {/* Slick Hair */}
@@ -127,8 +127,8 @@ export default function PixelHumanFigure({ agentId, size = "md", isWorking = fal
           </svg>
         );
 
-      case "stanley":
-        // Stanley Hudson: Moustache, gray suit
+      case "samuel":
+        // Samuelley Hudson: Moustache, gray suit
         return (
           <svg viewBox="0 0 32 40" className="w-full h-full drop-shadow-md">
             {/* Bald / Short Hair */}
@@ -149,8 +149,8 @@ export default function PixelHumanFigure({ agentId, size = "md", isWorking = fal
           </svg>
         );
 
-      case "toby":
-        // Toby Flenderson: Beige jacket, neutral expression
+      case "tyler":
+        // Tyler Reed: Beige jacket, neutral expression
         return (
           <svg viewBox="0 0 32 40" className="w-full h-full drop-shadow-md">
             {/* Receding Light Brown Hair */}
@@ -171,8 +171,8 @@ export default function PixelHumanFigure({ agentId, size = "md", isWorking = fal
           </svg>
         );
 
-      case "angela":
-        // Angela Martin: Blonde hair updo, high collar shirt, gray sweater
+      case "aria":
+        // Aria Morgan: Blonde hair updo, high collar shirt, gray sweater
         return (
           <svg viewBox="0 0 32 40" className="w-full h-full drop-shadow-md">
             {/* Blonde Hair Bun */}

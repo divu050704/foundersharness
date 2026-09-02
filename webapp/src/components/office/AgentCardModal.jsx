@@ -19,13 +19,13 @@ export default function AgentCardModal({ agent, onClose, onUpdateAgent, onDispat
     setCustomPrompt("");
   };
 
-  const handleRewardDundie = () => {
+  const handleRewardAchievement = () => {
     playRetroSound("chime");
     onUpdateAgent(agent.id, {
-      dundieScore: agent.dundieScore + 50,
+      achievementScore: agent.achievementScore + 50,
       logs: [
         ...agent.logs,
-        `[DUNDIE] Received +50 Dundie points from Admin! New score: ${agent.dundieScore + 50}`
+        `[ACHIEVEMENT] Received +50 Achievement points from Admin! New score: ${agent.achievementScore + 50}`
       ]
     });
   };
@@ -93,11 +93,11 @@ export default function AgentCardModal({ agent, onClose, onUpdateAgent, onDispat
           <div className="flex items-center gap-2">
             <button
               type="button"
-              onClick={handleRewardDundie}
+              onClick={handleRewardAchievement}
               className="flex items-center gap-1.5 bg-amber-500/20 text-amber-500 border border-amber-500/50 hover:bg-amber-500/30 px-2.5 py-1 rounded font-pixel text-[9px] cursor-pointer"
             >
               <Award className="size-3.5" />
-              <span>+50 Dundie Pts</span>
+              <span>+50 Achievement Pts</span>
             </button>
 
             <button
@@ -117,12 +117,11 @@ export default function AgentCardModal({ agent, onClose, onUpdateAgent, onDispat
               onChange={(e) => handleModelChange(e.target.value)}
               className="bg-background border border-border rounded text-[11px] px-2 py-1 font-mono text-foreground focus:outline-none focus:border-primary cursor-pointer"
             >
-              <option value="Claude 3.7 Sonnet">Claude 3.7 Sonnet</option>
-              <option value="Claude 3.5 Haiku">Claude 3.5 Haiku</option>
-              <option value="Grok-3 (Strict Enforcement)">Grok-3</option>
-              <option value="Gemini 2.5 Flash">Gemini 2.5 Flash</option>
-              <option value="DeepSeek R1 (Logic Master)">DeepSeek R1</option>
-              <option value="Llama 3.3 (Safety Checked)">Llama 3.3</option>
+              <option value="Orchestrator Core">Orchestrator Core</option>
+              <option value="High Performance Core">High Performance Core</option>
+              <option value="Fast Execution Core">Fast Execution Core</option>
+              <option value="Logic & Verification Core">Logic & Verification Core</option>
+              <option value="Safety & Compliance Core">Safety & Compliance Core</option>
             </select>
           </div>
         </div>
@@ -165,7 +164,7 @@ export default function AgentCardModal({ agent, onClose, onUpdateAgent, onDispat
             }`}
           >
             <Award className="size-3.5" />
-            <span>Stats & Dundie</span>
+            <span>Stats & Achievement</span>
           </button>
         </div>
 
@@ -206,13 +205,13 @@ export default function AgentCardModal({ agent, onClose, onUpdateAgent, onDispat
           {activeTab === "stats" && (
             <div className="grid grid-cols-2 gap-3">
               <div className="bg-secondary/60 border border-border p-3 rounded">
-                <div className="text-muted-foreground text-[10px] uppercase">Dundie Award Title</div>
-                <div className="text-xs font-bold text-amber-500 mt-1">{agent.dundieTitle}</div>
+                <div className="text-muted-foreground text-[10px] uppercase">Achievement Award Title</div>
+                <div className="text-xs font-bold text-amber-500 mt-1">{agent.achievementTitle}</div>
               </div>
 
               <div className="bg-secondary/60 border border-border p-3 rounded">
-                <div className="text-muted-foreground text-[10px] uppercase">Dundie Points</div>
-                <div className="text-base font-bold text-amber-400 mt-0.5">🏆 {agent.dundieScore} pts</div>
+                <div className="text-muted-foreground text-[10px] uppercase">Achievement Points</div>
+                <div className="text-base font-bold text-amber-400 mt-0.5">🏆 {agent.achievementScore} pts</div>
               </div>
 
               <div className="bg-secondary/60 border border-border p-3 rounded">

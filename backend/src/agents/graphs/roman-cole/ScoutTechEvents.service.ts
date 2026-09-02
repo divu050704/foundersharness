@@ -68,7 +68,7 @@ export class ScoutTechEvents {
     this.logger.debug("Ranking event relevance and investor density");
     const structuredModel = this.model.withStructuredOutput(this.eventListSchema);
     const evaluation = await structuredModel.invoke(`
-      You are Rory Howard, tech event and VC networking scout.
+      You are Roman Cole, tech event and VC networking scout.
       Analyze the scraped event data and founder memories to select the top 3 high-density networking events.
 
       User Query:

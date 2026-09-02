@@ -2,6 +2,10 @@
 
 **Founders Harness** is an autonomous AI Founder OS and multi-agent executive team platform. It empowers solo founders and startup teams by deploying specialized, autonomous AI agents (such as social media strategists, capital scouts, stealth browser specialists, and day planners) equipped with persistent long-term memory, real-time browser execution capabilities, and interactive web/desktop controls.
 
+Unlike traditional agent platforms or AI harnesses that require connecting external third-party services, managing complex OAuth tokens, or paying for cloud browser APIs, Founders Harness leverages the user's active browser session directly as an execution sandbox via an on-device Playwright bridge—allowing agents to scout, crawl, and automate actions natively without requiring service connection setups.
+
+Designed for seamless deployment, any founder can get started simply by downloading the desktop device-hook helper, signing into their browser sessions locally, and monitoring or managing their autonomous AI executive fleet remotely via the web app from anywhere.
+
 ---
 
 ## 🏛️ System Architecture
@@ -23,41 +27,198 @@ Founders Harness is built as a micro-ecosystem comprising three core components:
                                                       │ Memory & Persistence
                                                       ▼
                                          ┌──────────────────────────┐
-                                         │ MongoDB, Redis & Hindsight│
-                                         │  (Vector & Entity Graph) │
+                                         │ MongoDB & Hindsight Bank │
+                                         │ (Vector Store & Entity)  │
                                          └──────────────────────────┘
 ```
 
-1. **`backend/` (AI Core & Server)**: Built with **NestJS**, **LangChain**, **LangGraph**, **BullMQ**, and **Google Gemini 3.5/3.6**. Houses long-term entity/vector memory (**Hindsight Service**), agent personality graphs, and asynchronous task execution queues (`agent-tasks`). Runs a WebSocket relay server on `ws://localhost:5001`.
+1. **`backend/` (AI Core & Server)**: Built with **NestJS**, **LangChain**, **LangGraph**, **BullMQ**, and **Google Gemini 3.5/3.6**. Houses long-term entity/vector memory (**Hindsight Service** & **MongoDB Semantic Store**), agent personality graphs, and asynchronous task execution queues (`agent-tasks`). Runs a WebSocket relay server on `ws://localhost:5001`.
 2. **`webapp/` (Founder Workspace & Office UI)**: Built with **Next.js 16**, **React 19**, and **Tailwind CSS v4**. Includes a gamified Pixel Office floor plan, interactive Lean Canvas onboarding wizard, memory graph viewer, social media management dashboard, and `DeviceHookBridge` WebSocket relay.
-3. **`device-hook/` (Desktop Execution Bridge)**: A **C# .NET 8** Windows System Tray app running a native WebSocket server on `ws://localhost:9000`. Acts as an on-device execution engine allowing backend AI agents to control local **Playwright** browser instances (Chromium, Firefox, WebKit).
+3. **`device-hook/` (Desktop Execution Bridge)**: A **C# .NET 8** Windows System Tray app running a native WebSocket server on `ws://localhost:9000`. Acts as an on-device execution engine allowing backend AI agents to control local **Playwright** browser instances (Chromium, Firefox, WebKit). Browser sessions operate as an isolated local sandbox; unlike other harnesses, agents execute tasks natively within authenticated local browser sessions without connecting external third-party APIs or SaaS services.
 
 ---
 
 ## ✨ Major Capabilities & Recent Features
 
 ### 🤖 Autonomous AI Executive Team & Fleet
-- **Pamela Miller (Social Media Strategist)**: Designs 7-day story calendars and visual post banners.
-- **Derrick Vance (Capital & VC Scout)**: Scouts non-dilutive $100K+ NSF/SBIR grants and AWS/GCP cloud credits.
-- **Jimmy Harper (Stealth Browser Specialist)**: Automates social posting via headless CDP browser sessions on port 9222.
-- **Stan Hayes (Founder Day Planner)**: Enforces 4-hour deep work focus blocks and declines low-value sales calls.
-- **Rory Howard (Tech Event Scout)**: Crawls Luma, Eventbrite, and Twitter Spaces for VC demo nights.
-- **Angelica Martin (Budget Auditor)**: Audits daily LLM token costs and cancels unused SaaS subscriptions.
-- **Tobias Henderson (HR & Safety Officer)**: Monitors 3.4s human click delays and rate limit compliance.
+- **Sophia Chen (Social Media Strategist)**: Designs 7-day story calendars and visual post banners.
+- **Victor Stone (Capital & VC Scout)**: Scouts non-dilutive $100K+ NSF/SBIR grants and AWS/GCP cloud credits.
+- **Lucas Bennett (Stealth Browser Specialist)**: Automates social posting via headless CDP browser sessions on port 9222.
+- **Samuel Cross (Founder Day Planner)**: Enforces 4-hour deep work focus blocks and declines low-value sales calls.
+- **Roman Cole (Tech Event Scout)**: Crawls Luma, Eventbrite, and Twitter Spaces for VC demo nights.
+- **Aria Morgan (Budget Auditor)**: Audits daily LLM token costs and cancels unused SaaS subscriptions.
+- **Tyler Reed (HR & Safety Officer)**: Monitors 3.4s human click delays and rate limit compliance.
 
 ### 🔄 Asynchronous Task Queue & Real-Time Polling (BullMQ + Redis)
 - **Non-Blocking Agent Dispatch**: Email requests to agents are immediately enqueued to BullMQ (`agent-tasks`).
 - **Instant User Feedback**: UI displays non-blocking status notifications and auto-polls every 5 seconds for completed background email responses.
 
-### 🧠 Hindsight Vector Memory & Preferences Context Window
-- **Vector Bank Retention**: User queries and preferences are retained in Hindsight vector banks (`hindsightService.retain`).
-- **Context Window Preference Injection**: Before tool selection or response generation, agents recall user preferences and inject them into their LLM prompt context window.
-- **Clean Storage Separation**: User query preferences are managed exclusively by Hindsight, while task outputs are stored in MongoDB.
+### 🧠 Dual-Tier Memory & Context Window
+- **Hindsight Preference Engine**: User queries, preferences, and lean canvas entries are stored in Hindsight vector banks to build entity graphs and understand user details.
+- **Semantic Output Store**: Task outputs generated by agent tools are stored in MongoDB using Gemini vector embeddings (`gemini-embedding-001`) for instant semantic retrieval across workflows.
 
 ### 🌐 Dual-WebSocket Device Hook Relay Architecture
 - **Browser Sandbox Execution**: Agents collect web data and perform actions via local Playwright browser instances (`UseBrowser`).
 - **DeviceHook Bridge**: Next.js frontend runs `DeviceHookBridge`, relaying messages between backend (`ws://localhost:5001`) and desktop tray helper (`ws://localhost:9000`).
 - **Graceful Human Intervention Handling**: All LangGraph state machines include `humanInterventionCondition` routing to gracefully handle CAPTCHA or missing authentication requirements.
+
+---
+
+## 🧠 Memory Architecture (Hindsight & Semantic Vector Store)
+
+Founders Harness implements a clean, dual-tier memory system separating user query context from agent execution outputs:
+
+```
+                      ┌────────────────────────────────────────┐
+                      │            User Query / Email          │
+                      └───────────────────┬────────────────────┘
+                                          │
+                   ┌──────────────────────┴──────────────────────┐
+                   ▼                                             ▼
+┌─────────────────────────────────────┐       ┌─────────────────────────────────────┐
+│       Hindsight Memory Service      │       │     MongoDB Vector Memory Store     │
+│   (User Details & Preferences)      │       │      (Agent Execution Outputs)     │
+├─────────────────────────────────────┤       ├─────────────────────────────────────┤
+│ • Retains user queries, preferences │       │ • Stores structured task outputs    │
+│   & Lean Canvas details.            │       │   (e.g., social calendars, grants). │
+│ • Builds dynamic user entity graphs │       │ • Embeds output summary using       │
+│   and vector banks (`user:<email>`).│       │   `gemini-embedding-001`.           │
+│ • Recalled into prompt context      │       │ • Semantic vector search index      │
+│   before tool invocation.           │       │   (`memory_vector_index`, 3072d).   │
+└─────────────────────────────────────┘       └─────────────────────────────────────┘
+```
+
+### 1. User Query & Preference Handling (Hindsight Service)
+- **Retention**: When a user submits a query or email, `HindsightService.retain(email, content, context)` stores the query and user preference in Hindsight vector banks under `user:<email>`.
+- **User Detail & Entity Graph Understanding**: Hindsight processes user details, domain preferences, and business goals to construct an entity graph (`getEntityGraph`) and memory profile.
+- **Prompt Context Injection**: Before an agent processes a request, `hindsightService.retrieveMemory(email, query)` extracts recalled preferences and injects them directly into the LLM system/prompt context window.
+
+### 2. Output & Task Result Storage (Memory Store with Semantic Search)
+- **Structured Output Storage**: When agent tools finish executing (e.g. generating social media calendars, grant listings, or browser logs), outputs are persisted via `MemoryService.save(userId, record)`.
+- **Record Schema**:
+  ```typescript
+  type MemoryRecord = {
+    type: string;        // 'social-media-calendar', 'grant-list', etc.
+    content: unknown;     // Complete task output object
+    summary: string;      // Concise text summary used for embedding
+    producedBy: string;   // Agent identifier (e.g., 'sophia-chen')
+    createdAt: string;    // ISO timestamp
+  };
+  ```
+- **Semantic Search Indexing**:
+  - `MemoryModule` initializes `MongoDBStore` configured with `GoogleGenerativeAIEmbeddings` using the `gemini-embedding-001` model.
+  - Generates 3072-dimensional vector embeddings on the `summary` property stored in the `embedding` field under index `memory_vector_index`.
+- **Retrieval**: Agents query historical outputs using `MemoryService.recall(userId, query, type?, limit?)`, which performs vector similarity search via `store.search([userId, 'memory'], { query, limit })` to inform subsequent multi-step agent decisions.
+
+---
+
+## 🛠️ Prerequisites
+
+Before setting up Founders Harness, ensure your system meets the following requirements:
+
+- **Operating System**: Windows 10/11 (for the C# Tray Helper; backend/webapp are cross-platform).
+- **Node.js**: v20.0.0 or higher.
+- **Package Manager**: `npm` (v10+) or `bun`/`pnpm`.
+- **.NET SDK**: .NET 8.0 SDK (for building and running `device-hook`).
+- **Docker / Docker Desktop**: Required for running containerized infrastructure services (**Redis** and **Hindsight Memory Engine**).
+- **Database & Services**:
+  - **MongoDB**: Local instance (`mongodb://localhost:27017`) or MongoDB Atlas URI.
+  - **Redis**: Containerized instance (`localhost:6379`) for BullMQ background task processing.
+  - **Hindsight Memory Engine**: Containerized instance (`localhost:8080`) for user detail retention.
+- **API Keys**:
+  - **Google Gemini API Key** (`GEMINI_API_KEY`) for agent intelligence and embeddings.
+
+---
+
+## 🚀 Dev Env Setup
+
+### 1. Infrastructure Services (Docker Container Reference)
+
+Start the required Redis queue and Hindsight memory engine services using Docker:
+
+```bash
+# Start Redis container for BullMQ task queues
+docker run -d --name redis -p 6379:6379 redis:alpine
+
+# Start Hindsight memory engine container for user preference vector bank
+docker run -d --name hindsight -p 8080:8080 vectorize/hindsight:latest
+```
+
+---
+
+### 2. Backend AI Core (`backend/`)
+
+```bash
+cd backend
+npm install
+npm run start:dev
+```
+
+Environment configuration file `.env` in `backend/`:
+```env
+PORT=5000
+FRONTEND_URL=http://localhost:3000
+MONGODB_URI=mongodb://localhost:27017/foundersharness
+REDIS_HOST=localhost
+REDIS_PORT=6379
+GEMINI_API_KEY=your_gemini_api_key_here
+HINDSIGHT_URL=http://localhost:8080
+```
+
+---
+
+### 3. Web App Frontend (`webapp/`)
+
+```bash
+cd webapp
+npm install
+npm run dev
+```
+Open [http://localhost:3000](http://localhost:3000) in your browser.
+
+---
+
+### 4. Device Hook Desktop Helper (`device-hook/`)
+
+```bash
+cd device-hook
+dotnet.exe run
+```
+The helper will start in your Windows system tray, listening on `ws://localhost:9000`.
+
+---
+
+## 📁 Repository Structure
+
+```
+foundersharness/
+├── backend/                  # NestJS API, LangChain/LangGraph AI engine, Hindsight memory, BullMQ
+│   ├── src/
+│   │   ├── agents/           # Agent personalities, employees, LangGraph graphs, task processor
+│   │   │   ├── employees/    # Employee service classes (Sophia, Victor, Lucas, Samuel, etc.)
+│   │   │   └── graphs/       # LangGraph state machine executables per agent
+│   │   ├── memory/           # Hindsight memory service & MongoDB vector tools
+│   │   ├── onboarding/       # Lean canvas questionnaire & memory extraction
+│   │   └── browser/          # WebSocket bridge & browser execution pipeline
+│   └── package.json
+├── webapp/                   # Next.js 16 frontend workspace UI
+│   ├── src/
+│   │   ├── app/              # Dashboard, onboarding, memory, social pages
+│   │   └── components/       # Pixel office UI, lean canvas views, email modal
+│   └── package.json
+└── device-hook/              # C# .NET 8 Windows tray app & Playwright bridge
+```
+
+---
+
+## 🌐 WebSocket Protocol Reference
+
+Founders Harness utilizes dual WebSocket channels for device control and relaying:
+
+| Server | Port | Protocol | Purpose |
+| :--- | :--- | :--- | :--- |
+| **Backend Relay** | `ws://localhost:5001` | JSON Event Protocol | Relays requests between NestJS AI backend and Next.js WebApp |
+| **Device Hook** | `ws://localhost:9000` | Playwright CDP Protocol | Receives automation commands (`launch`, `navigate`, `click`, `fill`, `screenshot`, `content`) from local agents |
 
 ---
 
@@ -317,116 +478,7 @@ Add `YourEmployeeService` and `YourGraphService` to `providers` and `exports` in
 
 ---
 
-## 🛠️ Prerequisites
-
-Before installing Founders Harness, ensure your system meets the following requirements:
-
-- **Operating System**: Windows 10/11 (for the C# Tray Helper; backend/webapp are cross-platform).
-- **Node.js**: v20.0.0 or higher.
-- **Package Manager**: `npm` (v10+) or `bun`/`pnpm`.
-- **.NET SDK**: .NET 8.0 SDK (for building `device-hook`).
-- **PowerShell**: PowerShell 5.1 or PowerShell Core 7+.
-- **Database Services**:
-  - **MongoDB**: Local instance (`mongodb://localhost:27017`) or MongoDB Atlas URI.
-  - **Redis**: Local instance (`localhost:6379`) for BullMQ background task processing.
-- **API Keys**:
-  - **Google Gemini API Key** (`GEMINI_API_KEY`) for agent intelligence.
-
----
-
-## 🚀 Quick Setup & Installation
-
-### Option 1: Automated Windows Installer (Recommended)
-
-Run the included PowerShell setup script:
-
-```powershell
-# Run from repository root in PowerShell
-.\setup.ps1
-```
-
----
-
-### Option 2: Manual Installation (Step-by-Step)
-
-#### 1. Setup Backend (`backend/`)
-
-```bash
-cd backend
-npm install
-npm run start:dev
-```
-
-Environment file `.env` in `backend/`:
-```env
-PORT=5000
-FRONTEND_URL=http://localhost:3000
-MONGODB_URI=mongodb://localhost:27017/foundersharness
-REDIS_HOST=localhost
-REDIS_PORT=6379
-GEMINI_API_KEY=your_gemini_api_key_here
-HINDSIGHT_URL=http://localhost:8080
-```
-
----
-
-#### 2. Setup Web App (`webapp/`)
-
-```bash
-cd webapp
-npm install
-npm run dev
-```
-Open [http://localhost:3000](http://localhost:3000) in your browser.
-
----
-
-#### 3. Setup Device Hook Helper (`device-hook/`)
-
-```bash
-cd device-hook
-dotnet build -c Release
-dotnet run
-```
-The helper will start in your Windows system tray, listening on `ws://localhost:9000`.
-
----
-
-## 📁 Repository Structure
-
-```
-foundersharness/
-├── backend/                  # NestJS API, LangChain/LangGraph AI engine, Hindsight memory, BullMQ
-│   ├── src/
-│   │   ├── agents/           # Agent personalities, employees, LangGraph graphs, task processor
-│   │   │   ├── employees/    # Employee service classes (Pamela, Derrick, Jimmy, Stan, etc.)
-│   │   │   └── graphs/       # LangGraph state machine executables per agent
-│   │   ├── memory/           # Hindsight memory service & MongoDB vector tools
-│   │   ├── onboarding/       # Lean canvas questionnaire & memory extraction
-│   │   └── browser/          # WebSocket bridge & browser execution pipeline
-│   └── package.json
-├── webapp/                   # Next.js 16 frontend workspace UI
-│   ├── src/
-│   │   ├── app/              # Dashboard, onboarding, memory, social pages
-│   │   └── components/       # Pixel office UI, lean canvas views, email modal
-│   └── package.json
-├── device-hook/              # C# .NET 8 Windows tray app & Playwright bridge
-└── setup.ps1                 # Automated Windows setup & dependency script
-```
-
----
-
-## 🌐 WebSocket Protocol Reference
-
-Founders Harness utilizes dual WebSocket channels for device control and relaying:
-
-| Server | Port | Protocol | Purpose |
-| :--- | :--- | :--- | :--- |
-| **Backend Relay** | `ws://localhost:5001` | JSON Event Protocol | Relays requests between NestJS AI backend and Next.js WebApp |
-| **Device Hook** | `ws://localhost:9000` | Playwright CDP Protocol | Receives automation commands (`launch`, `navigate`, `click`, `fill`, `screenshot`, `content`) from local agents |
-
----
-
 ## 📄 License
 
-UNLICENSED / Proprietary — Founders Harness Project. All rights reserved.
+This project is licensed under the [MIT License](LICENSE).
+

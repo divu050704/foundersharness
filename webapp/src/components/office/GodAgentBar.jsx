@@ -35,7 +35,7 @@ export default function GodAgentBar({ onDispatchTask, onTriggerPreset }) {
           <div>
             <div className="flex items-center gap-2">
               <span className="font-pixel text-xs text-[#f59e0b] uppercase tracking-wide">
-                FOUNDER HARNESS GOD DISPATCHER (Michael Scott)
+                FOUNDER HARNESS GOD DISPATCHER (Alex Rivera)
               </span>
               <span className="bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 text-[9px] px-1.5 py-0.5 rounded font-vt323 tracking-wider uppercase animate-pulse">
                 ● Live & Connected to Backend
@@ -75,14 +75,14 @@ export default function GodAgentBar({ onDispatchTask, onTriggerPreset }) {
           className="bg-[#0f1419] border border-[#2e3e50] text-xs px-2.5 py-2 rounded font-mono text-white focus:outline-none focus:border-[#f59e0b] cursor-pointer w-full sm:w-auto"
         >
           <option value="all">⚡ Broadcast to All Agents</option>
-          <option value="michael">Michael (Chief Co-pilot)</option>
-          <option value="pam">Pam (Social Calendar Builder)</option>
-          <option value="jim">Jim (Device-Hook Browser Poster)</option>
-          <option value="dwight">Dwight (Grants & VC Scout)</option>
-          <option value="stanley">Stanley (Day Planner & Focus)</option>
-          <option value="ryan">Ryan (Meetup & Events Scout)</option>
-          <option value="toby">Toby (Safety & Rate Limits)</option>
-          <option value="angela">Angela (Budget Auditor)</option>
+          <option value="alex">Alex (Chief Co-pilot)</option>
+          <option value="sophia">Sophia (Social Calendar Builder)</option>
+          <option value="lucas">Lucas (Device-Hook Browser Poster)</option>
+          <option value="victor">Victor (Grants & VC Scout)</option>
+          <option value="samuel">Samuel (Day Planner & Focus)</option>
+          <option value="roman">Roman (Meetup & Events Scout)</option>
+          <option value="tyler">Tyler (Safety & Rate Limits)</option>
+          <option value="aria">Aria (Budget Auditor)</option>
         </select>
 
         <div className="relative flex-1 w-full">

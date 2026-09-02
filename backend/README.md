@@ -11,22 +11,22 @@ The backend service is structured into modular domains:
 ```
 src/
 ├── agents/                      # Multi-Agent Framework & Execution Graphs
-│   ├── employees/               # Employee service classes (Pamela, Derrick, Jimmy, Stan, Rory, Angelica, Tobias)
-│   │   ├── PamelaMiller.service.ts
-│   │   ├── DerrickVance.service.ts
-│   │   ├── JimmyHarper.service.ts
-│   │   ├── StanHayes.service.ts
-│   │   ├── RoryHoward.service.ts
-│   │   ├── AngelicaMartin.service.ts
-│   │   └── TobiasHenderson.service.ts
+│   ├── employees/               # Employee service classes (Sophia, Victor, Lucas, Samuel, Roman, Aria, Tyler)
+│   │   ├── SophiaChen.service.ts
+│   │   ├── VictorStone.service.ts
+│   │   ├── LucasBennett.service.ts
+│   │   ├── SamuelCross.service.ts
+│   │   ├── RomanCole.service.ts
+│   │   ├── AriaMorgan.service.ts
+│   │   └── TylerReed.service.ts
 │   ├── graphs/                  # LangGraph state machine executables per agent
-│   │   ├── pamela-miller/       # GenerateSocialMediaCalendar.service.ts
-│   │   ├── derrick-vance/       # ScoutGrantsAndCapital.service.ts
-│   │   ├── jimmy-harper/        # ExecuteBrowserPosting.service.ts
-│   │   ├── stan-hayes/          # OptimizeFounderCalendar.service.ts
-│   │   ├── rory-howard/         # ScoutTechEvents.service.ts
-│   │   ├── angelica-martin/     # AuditStartupBudget.service.ts
-│   │   └── tobias-henderson/    # AuditSafetyGuardrails.service.ts
+│   │   ├── sophia-chen/       # GenerateSocialMediaCalendar.service.ts
+│   │   ├── victor-stone/       # ScoutGrantsAndCapital.service.ts
+│   │   ├── lucas-bennett/        # ExecuteBrowserPosting.service.ts
+│   │   ├── samuel-cross/          # OptimizeFounderCalendar.service.ts
+│   │   ├── roman-cole/         # ScoutTechEvents.service.ts
+│   │   ├── aria-morgan/     # AuditStartupBudget.service.ts
+│   │   └── tyler-reed/    # AuditSafetyGuardrails.service.ts
 │   ├── agent-task.processor.ts  # BullMQ background worker task processor
 │   ├── agent-personalities.ts   # Personality traits & capabilities matrix
 │   ├── agents.service.ts        # Agent dispatcher & thread manager
@@ -46,18 +46,18 @@ src/
 
 ### 1. Multi-Agent Fleet & Dual-Path Query Handling
 - **7 Specialized AI Employees**:
-  - **Pamela Miller**: Social Media Strategist (`create-calendar` tool).
-  - **Derrick Vance**: Capital & VC Grant Scout (`scout-grants-capital` tool).
-  - **Jimmy Harper**: Stealth Browser Automation Specialist (`execute-browser-posting` tool).
-  - **Stan Hayes**: Day Planner & Focus Time Manager (`optimize-founder-calendar` tool).
-  - **Rory Howard**: Tech Event & Social Scout (`scout-tech-events` tool).
-  - **Angelica Martin**: Startup Budget & Billing Auditor (`audit-startup-budget` tool).
-  - **Tobias Henderson**: HR & Safety Officer (`audit-safety-guardrails` tool).
+  - **Sophia Chen**: Social Media Strategist (`create-calendar` tool).
+  - **Victor Stone**: Capital & VC Grant Scout (`scout-grants-capital` tool).
+  - **Lucas Bennett**: Stealth Browser Automation Specialist (`execute-browser-posting` tool).
+  - **Samuel Cross**: Day Planner & Focus Time Manager (`optimize-founder-calendar` tool).
+  - **Roman Cole**: Tech Event & Social Scout (`scout-tech-events` tool).
+  - **Aria Morgan**: Startup Budget & Billing Auditor (`audit-startup-budget` tool).
+  - **Tyler Reed**: HR & Safety Officer (`audit-safety-guardrails` tool).
 - **Dual-Path Reply Engine**: Tool execution path for actionable requests vs conversational path for general questions/small talk without claiming unperformed work.
 
 ### 2. Asynchronous Queue Processing (BullMQ + Redis)
 - **Non-Blocking Dispatch**: Incoming emails received via `POST /api/agents/reply-email` are enqueued directly to BullMQ queue `'agent-tasks'`.
-- **Background Task Processor**: `AgentTaskProcessor` worker processes jobs (`process-pamela-miller`, `process-derrick-vance`, etc.) asynchronously and appends the agent's completed response email to the MongoDB thread.
+- **Background Task Processor**: `AgentTaskProcessor` worker processes jobs (`process-sophia-chen`, `process-victor-stone`, etc.) asynchronously and appends the agent's completed response email to the MongoDB thread.
 
 ### 3. Hindsight Vector Memory & Context Window Ingestion
 - **Vector Bank Retention**: User email queries and preferences are retained in Hindsight banks using `hindsightService.retain(sender, content, context)`.
@@ -112,7 +112,7 @@ The API server will run on [http://localhost:5000/api](http://localhost:5000/api
 ### Agents Controller (`/api/agents`)
 
 - `POST /api/agents/reply-email`
-  - **Body**: `{ "receiver": "pamela.miller@foundersharness.ai", "content": "Build a 7-day launch calendar", "threadId": "..." }`
+  - **Body**: `{ "receiver": "sophia.chen@foundersharness.ai", "content": "Build a 7-day launch calendar", "threadId": "..." }`
   - **Response**: `{ "reply": "I have initiated the process, will get back whenever it is completed" }`
 - `GET /api/agents/threads`
   - **Response**: Array of MongoDB `EmailThread` documents.

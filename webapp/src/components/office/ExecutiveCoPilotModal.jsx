@@ -36,7 +36,7 @@ export function formatEmailDate(dateInput) {
 
 
 
-export default function MichaelScottOSModal({
+export default function ExecutiveCoPilotModal({
   agents,
   onClose,
   onDispatchTask,
@@ -108,7 +108,7 @@ export default function MichaelScottOSModal({
                 matchingAgentSender !== undefined ||
                 (email.sender &&
                   (email.sender.includes('@foundersharness.ai') ||
-                    email.sender.includes('@dundermifflin.com')));
+                    email.sender.includes('@foundersharness.ai')));
               const agentObj = matchingAgentSender || matchingAgentReceiver;
               const createdAt = email.createdAt ? new Date(email.createdAt) : new Date();
 
@@ -746,7 +746,7 @@ return (
                                 setRecipientEmail(e.target.value);
                                 setShowSuggestions(true);
                               }}
-                              placeholder="Type agent email (e.g. dwight.schrute@dundermifflin.com)..."
+                              placeholder="Type agent email (e.g. victor.stone@foundersharness.ai)..."
                               className="w-full bg-white border border-[#7f9db9] px-2 py-1 text-xs rounded text-slate-900 placeholder:text-slate-400 focus:outline-none font-mono"
                             />
 
@@ -761,7 +761,7 @@ return (
                                     type="button"
                                     key={agent.id}
                                     onMouseDown={() => {
-                                      setRecipientEmail(agent.email || `${agent.id}@dundermifflin.com`);
+                                      setRecipientEmail(agent.email || `${agent.id}@foundersharness.ai`);
                                       setSelectedAgentId(agent.id);
                                       setShowSuggestions(false);
                                     }}
@@ -778,14 +778,14 @@ return (
                                 <button
                                   type="button"
                                   onMouseDown={() => {
-                                    setRecipientEmail("all.agents@dundermifflin.com");
+                                    setRecipientEmail("all.agents@foundersharness.ai");
                                     setSelectedAgentId("all");
                                     setShowSuggestions(false);
                                   }}
                                   className="w-full text-left px-2 py-1.5 bg-amber-50 hover:bg-amber-500 hover:text-white text-xs font-bold text-amber-800 flex items-center justify-between cursor-pointer transition-colors"
                                 >
                                   <span>📢 BROADCAST TO ALL AGENTS</span>
-                                  <span className="text-[9px] font-mono">&lt;all.agents@dundermifflin.com&gt;</span>
+                                  <span className="text-[9px] font-mono">&lt;all.agents@foundersharness.ai&gt;</span>
                                 </button>
                               </div>
                             )}
@@ -861,7 +861,7 @@ return (
                                 {agent.name}
                               </h5>
                               <span className="text-[9px] font-pixel px-1.5 py-0.5 rounded bg-[#0055ea] text-white font-bold">
-                                {agent.aiModel.split(" ")[0]}
+                                {agent.harnessDomain}
                               </span>
                             </div>
                             <p className="text-[10px] text-slate-600 font-bold">
@@ -875,14 +875,14 @@ return (
 
                         <div className="flex items-center gap-2 shrink-0">
                           <span className="text-xs font-bold text-amber-600">
-                            🏆 {agent.dundieScore} Pts
+                            🏆 {agent.achievementScore} Pts
                           </span>
                           <button
                             type="button"
                             onClick={() => {
                               playRetroSound("click");
                               setActiveApp("email");
-                              setRecipientEmail(agent.email || `${agent.id}@dundermifflin.com`);
+                              setRecipientEmail(agent.email || `${agent.id}@foundersharness.ai`);
                               setSelectedAgentId(agent.id);
                             }}
                             className="bg-[#0055ea] hover:bg-[#0047bf] text-white font-pixel text-[10px] px-3 py-1.5 rounded border border-[#003da6] cursor-pointer font-bold shadow"
@@ -903,7 +903,7 @@ return (
                     📝 NOTEPAD XP — FOUNDER DAY STRATEGY
                   </div>
                   <textarea
-                    defaultValue={`FOUNDER HARNESS ROADMAP & DAY PLAN:\n\n1. Social Media: Pam & Jim batch 14 posts via CDP browser session.\n2. Grants & Capital: Dwight crawling NSF & SBIR non-dilutive grants.\n3. Focus Time: Stanley protecting 4-hour deep work coding block.\n4. Events & Safety: Ryan & Toby checking local demo nights and API rate limits.`}
+                    defaultValue={`FOUNDER HARNESS ROADMAP & DAY PLAN:\n\n1. Social Media: Sophia & Lucas batch 14 posts via CDP browser session.\n2. Grants & Capital: Victor crawling NSF & SBIR non-dilutive grants.\n3. Focus Time: Samuel protecting 4-hour deep work coding block.\n4. Events & Safety: Roman & Tyler checking local demo nights and API rate limits.`}
                     className="flex-1 w-full p-3 font-mono text-xs text-slate-800 border border-[#eee] rounded resize-none focus:outline-none leading-relaxed"
                   />
                 </div>

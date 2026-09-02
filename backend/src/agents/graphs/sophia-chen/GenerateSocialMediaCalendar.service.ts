@@ -29,7 +29,7 @@ export class GenerateSocialMediaCalendar {
         textContent: z.string().describe("A complete, publication-ready social media post caption based on the assigned topic. The caption should have a strong hook, communicate one clear idea, provide value to the target audience, match the startup's tone and positioning, and include a natural call to action when appropriate"),
         imagePrompt: z.string().describe("A detailed natural-language prompt for an image-generation model to create the visual accompanying the social media post. Describe the main subject, composition, setting, objects, mood, lighting, visual style, color direction, brand context, and any important visual elements. The image should complement the post and feel like a professional marketing asset rather than a generic stock image"),
         hashtags: z.array(z.string().describe("A relevant hashtag directly related to the post topic, startup, industry, target audience, or content theme"))
-            .describe("A curated list of relevant hashtags intended to improve discoverability and reach. Avoid irrelevant, overly broad, repetitive, or spam-like hashtags")
+            .describe("A curated list of relevant hashtags intended to improve discoverability and reach. Avoid irrelevant, overly broad, repetitive, or ssophia-like hashtags")
     })
 
     private stateSchema = new StateSchema({
@@ -127,7 +127,7 @@ export class GenerateSocialMediaCalendar {
             7. Do not fabricate customer stories, testimonials, statistics, product capabilities, partnerships, funding information, business results, quotes, announcements, or other specific facts that are not supported by the provided context.
             8. Use natural social media formatting. Keep the writing concise enough to remain readable while providing enough substance to communicate the idea effectively.
             9. Include a call to action when it naturally fits the topic. Do not force a call to action into every post.
-            10. Generate relevant hashtags based on the topic, startup, industry, target audience, and content theme. Avoid irrelevant or spam-like hashtags.
+            10. Generate relevant hashtags based on the topic, startup, industry, target audience, and content theme. Avoid irrelevant or ssophia-like hashtags.
             For the image prompt:
             Create a detailed prompt for an image-generation model that visually complements the written post.
             Describe the primary subject, composition, setting, important objects, mood, lighting, visual style, color direction, brand context, and other important visual details needed to create a professional social media marketing image.

@@ -71,7 +71,7 @@ export class ScoutGrantsAndCapital {
     this.logger.debug("Evaluating grant matches against founder memories");
     const structuredModel = this.model.withStructuredOutput(this.grantListSchema);
     const result = await structuredModel.invoke(`
-      You are Derrick Vance, an expert non-dilutive capital scout.
+      You are Victor Stone, an expert non-dilutive capital scout.
       Analyze the scraped funding data and founder memories to identify high-value zero-equity grants and cloud credit packages.
 
       User Query:

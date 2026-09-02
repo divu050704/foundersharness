@@ -1,6 +1,6 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
-import { ExecuteBrowserPosting } from "../graphs/jimmy-harper/ExecuteBrowserPosting.service";
+import { AuditSafetyGuardrails } from "../graphs/tyler-reed/AuditSafetyGuardrails.service";
 import z from "zod";
 import { tool } from "@langchain/core/tools";
 import { MemoryService } from "../../memory/memory.service";
@@ -9,11 +9,11 @@ import { AGENT_PERSONALITIES } from "../agent-personalities";
 import { EmailAgentDTO } from "../dto/create-email-agent.dto";
 
 @Injectable()
-export class JimmyHarperService {
-  private readonly logger = new Logger(JimmyHarperService.name);
+export class TylerReedService {
+  private readonly logger = new Logger(TylerReedService.name);
 
   constructor(
-    private readonly executeBrowserGraph: ExecuteBrowserPosting,
+    private readonly auditSafetyGraph: AuditSafetyGuardrails,
     private readonly memory: MemoryService,
     private readonly hindsightService: HindsightService,
   ) {}
@@ -22,36 +22,36 @@ export class JimmyHarperService {
     model: "gemini-3.5-flash-lite",
   });
 
-  executeBrowserTool = tool(
+  auditSafetyTool = tool(
     async ({ query, session }) => {
-      this.logger.debug("Extracting Knowledge for Jimmy Harper");
+      this.logger.debug("Extracting Knowledge for Tyler Reed");
       const memories = await this.memory.recall(session, query);
-      this.logger.debug("Invoking ExecuteBrowserPosting graph");
+      this.logger.debug("Invoking AuditSafetyGuardrails graph");
 
-      return await this.executeBrowserGraph.graph.invoke({
+      return await this.auditSafetyGraph.graph.invoke({
         query,
         memories,
         session,
       });
     },
     {
-      name: "execute-browser-posting",
+      name: "audit-safety-guardrails",
       description: `
-        Automate publishing social media updates via authenticated Playwright browser sessions ONLY when explicitly asked to post or publish content.
+        Audit 3.4s human-like click delays, social posting rate limits, and zero shadowban compliance ONLY when explicitly asked to check safety, delays, or rate limits.
 
-        DO NOT call this tool for casual conversation, general questions about Jimmy, small talk, or acknowledgments.
+        DO NOT call this tool for casual conversation, general questions about Tyler, small talk, or acknowledgments.
       `,
       schema: z.object({
-        query: z.string().describe("User request to publish a social media update via browser automation"),
+        query: z.string().describe("User request to check safety, delays, or rate limits"),
         session: z.string().describe("Active session name"),
       }),
     }
   );
 
-  modelWithTools = this.model.bindTools([this.executeBrowserTool]);
+  modelWithTools = this.model.bindTools([this.auditSafetyTool]);
 
   async runModel(email: EmailAgentDTO, sender: string, previousContext?: string, currentThreadId?: string) {
-    const personality = AGENT_PERSONALITIES["jimmy-harper"];
+    const personality = AGENT_PERSONALITIES["tyler-reed"];
 
     // Save user query in Hindsight only
     try {
@@ -59,7 +59,7 @@ export class JimmyHarperService {
         await this.hindsightService.retain(
           sender,
           email.content,
-          "User Email Query & Preference for Jimmy Harper"
+          "User Email Query & Preference for Tyler Reed"
         );
       }
     } catch (e) {
@@ -75,7 +75,7 @@ export class JimmyHarperService {
     } catch (_e) {}
 
     const prompt = `
-      You are Jimmy Harper, Stealth Browser Automation Specialist.
+      You are Tyler Reed, HR, API Rate Limit & Safety Guardrail Monitor.
       PERSONALITY: ${personality.personalitySummary}
       CAPABILITIES: ${personality.capabilities?.join("\n") ?? ""}
       PAST CONVERSATION: ${previousContext || "None"}
@@ -84,15 +84,15 @@ export class JimmyHarperService {
       ${hindsightMemories ? JSON.stringify(hindsightMemories) : ""}
       USER REQUEST: ${email.content}
       SESSION NAME: ${sender}
-      Decide whether to use execute-browser-posting tool.
+      Decide whether to use audit-safety-guardrails tool.
     `;
 
     const result = await this.modelWithTools.invoke(prompt);
     let toolResult: any = undefined;
 
     for (const call of result.tool_calls ?? []) {
-      if (call.name === "execute-browser-posting") {
-        const messageResult = await this.executeBrowserTool.invoke(call);
+      if (call.name === "audit-safety-guardrails") {
+        const messageResult = await this.auditSafetyTool.invoke(call);
         let graphResult: any = messageResult;
         if (typeof messageResult?.content === "string") {
           try {
@@ -103,10 +103,10 @@ export class JimmyHarperService {
         }
         toolResult = graphResult;
         await this.memory.save(sender, {
-          type: "browser-posting-result",
+          type: "safety-audit-result",
           content: graphResult,
-          summary: `Browser post automated: ${graphResult?.permalink || email.content}`,
-          producedBy: "jimmy-harper",
+          summary: `Safety compliance audit executed: ${graphResult?.complianceSummary || email.content}`,
+          producedBy: "tyler-reed",
         });
       }
     }
@@ -114,7 +114,7 @@ export class JimmyHarperService {
     let finalPrompt: string;
     if (toolResult) {
       finalPrompt = `
-        You are Jimmy Harper. Write a witty, relaxed email reply summarizing the browser posting execution.
+        You are Tyler Reed. Write a polite, compliance-minded email reply summarizing the safety audit work.
         USER REQUEST: ${email.content}
         WORK RESULT: ${JSON.stringify(toolResult, null, 2)}
         USER PREFERENCES: ${JSON.stringify(userMemories)}
@@ -123,8 +123,8 @@ export class JimmyHarperService {
       `;
     } else {
       finalPrompt = `
-        You are Jimmy Harper, Stealth Browser Automation Specialist.
-        Write a friendly, clever email reply to the user's request.
+        You are Tyler Reed, HR, API Rate Limit & Safety Guardrail Monitor.
+        Write a polite, reassuring, compliance-minded email reply to the user's request.
         IMPORTANT: No tool was used for this request. Do not pretend work was performed.
         USER REQUEST: ${email.content}
         PAST CONVERSATION: ${previousContext || "None"}

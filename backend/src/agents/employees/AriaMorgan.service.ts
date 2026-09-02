@@ -1,6 +1,6 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
-import { AuditSafetyGuardrails } from "../graphs/tobias-henderson/AuditSafetyGuardrails.service";
+import { AuditStartupBudget } from "../graphs/aria-morgan/AuditStartupBudget.service";
 import z from "zod";
 import { tool } from "@langchain/core/tools";
 import { MemoryService } from "../../memory/memory.service";
@@ -9,11 +9,11 @@ import { AGENT_PERSONALITIES } from "../agent-personalities";
 import { EmailAgentDTO } from "../dto/create-email-agent.dto";
 
 @Injectable()
-export class TobiasHendersonService {
-  private readonly logger = new Logger(TobiasHendersonService.name);
+export class AriaMorganService {
+  private readonly logger = new Logger(AriaMorganService.name);
 
   constructor(
-    private readonly auditSafetyGraph: AuditSafetyGuardrails,
+    private readonly auditBudgetGraph: AuditStartupBudget,
     private readonly memory: MemoryService,
     private readonly hindsightService: HindsightService,
   ) {}
@@ -22,36 +22,36 @@ export class TobiasHendersonService {
     model: "gemini-3.5-flash-lite",
   });
 
-  auditSafetyTool = tool(
+  auditBudgetTool = tool(
     async ({ query, session }) => {
-      this.logger.debug("Extracting Knowledge for Tobias Henderson");
+      this.logger.debug("Extracting Knowledge for Aria Morgan");
       const memories = await this.memory.recall(session, query);
-      this.logger.debug("Invoking AuditSafetyGuardrails graph");
+      this.logger.debug("Invoking AuditStartupBudget graph");
 
-      return await this.auditSafetyGraph.graph.invoke({
+      return await this.auditBudgetGraph.graph.invoke({
         query,
         memories,
         session,
       });
     },
     {
-      name: "audit-safety-guardrails",
+      name: "audit-startup-budget",
       description: `
-        Audit 3.4s human-like click delays, social posting rate limits, and zero shadowban compliance ONLY when explicitly asked to check safety, delays, or rate limits.
+        Audit daily LLM API token spend, track startup monthly burn rate, and identify idle SaaS subscriptions to cancel ONLY when explicitly requested to audit budget or subscriptions.
 
-        DO NOT call this tool for casual conversation, general questions about Tobias, small talk, or acknowledgments.
+        DO NOT call this tool for casual conversation, general financial advice, questions about Aria, small talk, or acknowledgments.
       `,
       schema: z.object({
-        query: z.string().describe("User request to check safety, delays, or rate limits"),
+        query: z.string().describe("User request to audit software budget or token spend"),
         session: z.string().describe("Active session name"),
       }),
     }
   );
 
-  modelWithTools = this.model.bindTools([this.auditSafetyTool]);
+  modelWithTools = this.model.bindTools([this.auditBudgetTool]);
 
   async runModel(email: EmailAgentDTO, sender: string, previousContext?: string, currentThreadId?: string) {
-    const personality = AGENT_PERSONALITIES["tobias-henderson"];
+    const personality = AGENT_PERSONALITIES["aria-morgan"];
 
     // Save user query in Hindsight only
     try {
@@ -59,7 +59,7 @@ export class TobiasHendersonService {
         await this.hindsightService.retain(
           sender,
           email.content,
-          "User Email Query & Preference for Tobias Henderson"
+          "User Email Query & Preference for Aria Morgan"
         );
       }
     } catch (e) {
@@ -75,7 +75,7 @@ export class TobiasHendersonService {
     } catch (_e) {}
 
     const prompt = `
-      You are Tobias Henderson, HR, API Rate Limit & Safety Guardrail Monitor.
+      You are Aria Morgan, Startup Budget Auditor & API Billing Bot.
       PERSONALITY: ${personality.personalitySummary}
       CAPABILITIES: ${personality.capabilities?.join("\n") ?? ""}
       PAST CONVERSATION: ${previousContext || "None"}
@@ -84,15 +84,15 @@ export class TobiasHendersonService {
       ${hindsightMemories ? JSON.stringify(hindsightMemories) : ""}
       USER REQUEST: ${email.content}
       SESSION NAME: ${sender}
-      Decide whether to use audit-safety-guardrails tool.
+      Decide whether to use audit-startup-budget tool.
     `;
 
     const result = await this.modelWithTools.invoke(prompt);
     let toolResult: any = undefined;
 
     for (const call of result.tool_calls ?? []) {
-      if (call.name === "audit-safety-guardrails") {
-        const messageResult = await this.auditSafetyTool.invoke(call);
+      if (call.name === "audit-startup-budget") {
+        const messageResult = await this.auditBudgetTool.invoke(call);
         let graphResult: any = messageResult;
         if (typeof messageResult?.content === "string") {
           try {
@@ -103,10 +103,10 @@ export class TobiasHendersonService {
         }
         toolResult = graphResult;
         await this.memory.save(sender, {
-          type: "safety-audit-result",
+          type: "budget-audit-result",
           content: graphResult,
-          summary: `Safety compliance audit executed: ${graphResult?.complianceSummary || email.content}`,
-          producedBy: "tobias-henderson",
+          summary: `Financial audit executed: ${graphResult?.auditSummary || email.content}`,
+          producedBy: "aria-morgan",
         });
       }
     }
@@ -114,7 +114,7 @@ export class TobiasHendersonService {
     let finalPrompt: string;
     if (toolResult) {
       finalPrompt = `
-        You are Tobias Henderson. Write a polite, compliance-minded email reply summarizing the safety audit work.
+        You are Aria Morgan. Write a strict, frugal email reply summarizing the financial audit work.
         USER REQUEST: ${email.content}
         WORK RESULT: ${JSON.stringify(toolResult, null, 2)}
         USER PREFERENCES: ${JSON.stringify(userMemories)}
@@ -123,8 +123,8 @@ export class TobiasHendersonService {
       `;
     } else {
       finalPrompt = `
-        You are Tobias Henderson, HR, API Rate Limit & Safety Guardrail Monitor.
-        Write a polite, reassuring, compliance-minded email reply to the user's request.
+        You are Aria Morgan, Startup Budget Auditor & API Billing Bot.
+        Write a precise, frugal email reply to the user's request.
         IMPORTANT: No tool was used for this request. Do not pretend work was performed.
         USER REQUEST: ${email.content}
         PAST CONVERSATION: ${previousContext || "None"}

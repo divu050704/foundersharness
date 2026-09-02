@@ -8,12 +8,12 @@ export default function ConferenceRoomModal({ agents, onClose }) {
   const [topic, setTopic] = useState("Sprint Architecture & Codebase Refactor Strategy");
   const [isSimulating, setIsSimulating] = useState(false);
   const [transcript, setTranscript] = useState([
-    { speaker: "Michael Scott", text: "Welcome everyone to Conference Room A! Today we are discussing our next big multi-agent release.", time: "10:00 AM", color: "text-amber-500" },
-    { speaker: "Dwight Schrute", text: "Question: Have all unit tests passed with 100% coverage before this meeting was called?", time: "10:01 AM", color: "text-emerald-500" },
-    { speaker: "Jim Halpert", text: "(Looks at camera) Yes Dwight. I pushed clean Zustand stores and optimized re-renders 5 minutes ago.", time: "10:02 AM", color: "text-cyan-400" },
-    { speaker: "Pam Beesly", text: "The UI design now strictly uses the Dunder Mifflin pixel theme and custom retro typography.", time: "10:03 AM", color: "text-pink-400" },
-    { speaker: "Stanley Hudson", text: "Is this meeting going to delay Pretzel Day? My SQL vector queries are already running.", time: "10:04 AM", color: "text-blue-400" },
-    { speaker: "Toby Flenderson", text: "Just making sure we stay within API rate limit compliance...", time: "10:05 AM", color: "text-slate-400" }
+    { speaker: "Alex Rivera", text: "Welcome everyone to Conference Room A! Today we are discussing our next big multi-agent release.", time: "10:00 AM", color: "text-amber-500" },
+    { speaker: "Victor Stone", text: "Question: Have all unit tests passed with 100% coverage before this meeting was called?", time: "10:01 AM", color: "text-emerald-500" },
+    { speaker: "Lucas Bennett", text: "Yes Victor. I pushed clean Zustand stores and optimized re-renders 5 minutes ago.", time: "10:02 AM", color: "text-cyan-400" },
+    { speaker: "Sophia Chen", text: "The UI design now strictly uses the Founder Harness pixel theme and custom retro typography.", time: "10:03 AM", color: "text-pink-400" },
+    { speaker: "Samuel Cross", text: "My SQL vector queries are already running smoothly.", time: "10:04 AM", color: "text-blue-400" },
+    { speaker: "Tyler Reed", text: "Just making sure we stay within API rate limit compliance...", time: "10:05 AM", color: "text-slate-400" }
   ]);
 
   const handleStartSimulation = () => {
@@ -21,10 +21,10 @@ export default function ConferenceRoomModal({ agents, onClose }) {
     playRetroSound("blip");
 
     const simLines = [
-      { speaker: "Michael Scott", text: "That's what I'm talking about! Exceptional teamwork. Dwight, issue Dundie awards to everyone!", color: "text-amber-500" },
-      { speaker: "Dwight Schrute", text: "Understood Manager Michael! Awarding +50 Dundie points to all engineering subagents.", color: "text-emerald-500" },
-      { speaker: "Angela Martin", text: "Token cost estimate for this meeting: $0.02. Approved.", color: "text-red-400" },
-      { speaker: "Ryan Howard", text: "Wuphf.com integration is ready whenever we spin up the Solana devnet.", color: "text-purple-400" }
+      { speaker: "Alex Rivera", text: "Exceptional teamwork! Victor, issue Achievement awards to everyone!", color: "text-amber-500" },
+      { speaker: "Victor Stone", text: "Understood Alex! Awarding +50 Achievement points to all engineering subagents.", color: "text-emerald-500" },
+      { speaker: "Aria Morgan", text: "Token cost estimate for this meeting: $0.02. Approved.", color: "text-red-400" },
+      { speaker: "Roman Cole", text: "Networking event integration is ready whenever we deploy.", color: "text-purple-400" }
     ];
 
     simLines.forEach((line, idx) => {

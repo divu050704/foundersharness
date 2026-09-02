@@ -10,7 +10,7 @@ import { EmailAgentDTO } from "./dto/create-email-agent.dto";
 import { InjectModel } from "@nestjs/mongoose";
 import { AGENT_PERSONALITIES } from "./agent-personalities";
 import { EmailThread } from "./schemas/email.schema";
-import { PamelaMillerService } from "./employees/PamelaMiller.service";
+import { SophiaChenService } from "./employees/SophiaChen.service";
 import { UpdateEmailAgentDTO } from "./dto/update-email-agent.dto";
 
 
@@ -52,7 +52,7 @@ export class AgentsService {
   }
 
   async saveEmail(email: UpdateEmailAgentDTO, sender: string) {
-    const isAgentSender = sender.includes('@foundersharness.ai') || sender.includes('@dundermifflin.com');
+    const isAgentSender = sender.includes('@foundersharness.ai') || sender.includes('@foundersharness.ai');
 
     const newEmail = {
         attachments: email.attachments || [],
@@ -123,16 +123,16 @@ export class AgentsService {
     }
 
     const agentJobMap: Record<string, string> = {
-      "pamela.miller@foundersharness.ai": "process-pamela-miller",
-      "derrick.vance@foundersharness.ai": "process-derrick-vance",
-      "jimmy.harper@foundersharness.ai": "process-jimmy-harper",
-      "stan.hayes@foundersharness.ai": "process-stan-hayes",
-      "rory.howard@foundersharness.ai": "process-rory-howard",
-      "angelica.martin@foundersharness.ai": "process-angelica-martin",
-      "tobias.henderson@foundersharness.ai": "process-tobias-henderson",
+      "sophia.chen@foundersharness.ai": "process-sophia-chen",
+      "victor.stone@foundersharness.ai": "process-victor-stone",
+      "lucas.bennett@foundersharness.ai": "process-lucas-bennett",
+      "samuel.cross@foundersharness.ai": "process-samuel-cross",
+      "roman.cole@foundersharness.ai": "process-roman-cole",
+      "aria.morgan@foundersharness.ai": "process-aria-morgan",
+      "tyler.reed@foundersharness.ai": "process-tyler-reed",
     };
 
-    const jobName = agentJobMap[email.receiver.toLowerCase()] || "process-pamela-miller";
+    const jobName = agentJobMap[email.receiver.toLowerCase()] || "process-sophia-chen";
 
     await this.agentQueue.add(jobName, {
       email,

@@ -6,7 +6,7 @@ import { playRetroSound, isAudioEnabled, toggleAudio } from "@/lib/retroAudio";
 export default function TopHeaderBar({
   onOpenMemory,
   onOpenConference,
-  onOpenDundies,
+  onOpenAchievements,
   onTriggerCoffee
 }) {
   return (
@@ -62,12 +62,12 @@ export default function TopHeaderBar({
           type="button"
           onClick={() => {
             playRetroSound("chime");
-            onOpenDundies();
+            onOpenAchievements();
           }}
           className="flex items-center gap-1.5 bg-[#b58900] hover:bg-[#a17a00] text-[#fdf6e3] px-3 py-1.5 rounded font-pixel text-[9px] transition-all cursor-pointer font-bold shadow"
         >
           <Award className="size-3.5" />
-          <span>Dundie Awards 🏆</span>
+          <span>Achievement Awards 🏆</span>
         </button>
 
         <button

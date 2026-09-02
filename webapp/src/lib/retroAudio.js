@@ -63,7 +63,7 @@ export function playRetroSound(type = "click") {
         break;
 
       case "chime":
-        // Dundie / Achievement Fanfare
+        // Achievement / Achievement Fanfare
         [523.25, 659.25, 783.99, 1046.50].forEach((freq, idx) => {
           const o = ctx.createOscillator();
           const g = ctx.createGain();

@@ -65,7 +65,7 @@ export class AuditSafetyGuardrails {
     this.logger.debug("Auditing browser human-like click delays and posting rate limits");
     const structuredModel = this.model.withStructuredOutput(this.safetyOutputSchema);
     const result = await structuredModel.invoke(`
-      You are Tobias Henderson, HR, API Rate Limit & Safety Guardrail Monitor.
+      You are Tyler Reed, HR, API Rate Limit & Safety Guardrail Monitor.
       Audit the system's browser automation delays and social rate limits.
 
       User Query:

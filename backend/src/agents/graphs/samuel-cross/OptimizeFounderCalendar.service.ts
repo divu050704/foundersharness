@@ -72,7 +72,7 @@ export class OptimizeFounderCalendar {
     this.logger.debug("Structuring 4-hour deep work focus blocks and filtering distractions");
     const structuredModel = this.model.withStructuredOutput(this.calendarOutputSchema);
     const result = await structuredModel.invoke(`
-      You are Stan Hayes, Founder Day Planner & Focus Time Manager.
+      You are Samuel Cross, Founder Day Planner & Focus Time Manager.
       Structure the founder's daily calendar with strict focus guardrails.
 
       User Query:

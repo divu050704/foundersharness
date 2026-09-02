@@ -102,7 +102,7 @@ export default function Sidebar() {
             <span>ONLINE</span>
           </div>
           <p className="text-[10px] text-muted-foreground leading-tight">
-            8 CLI Agents Active on Floor 1. Michael Scott presiding.
+            8 CLI Agents Active on Floor 1. Alex Rivera presiding.
           </p>
         </div>
       </div>

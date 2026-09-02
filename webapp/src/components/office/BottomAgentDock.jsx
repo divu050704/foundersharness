@@ -89,7 +89,7 @@ export default function BottomAgentDock({ agents, selectedAgentId, onSelectAgent
                   <h5 className="font-pixel text-xs text-[#073642] font-bold truncate max-w-[110px]">
                     {agent.name.split(" ")[0]}
                   </h5>
-                  {agent.id === "michael" && <span className="text-[10px]">👑</span>}
+                  {agent.id === "alex" && <span className="text-[10px]">👑</span>}
                 </div>
 
                 <p className="text-[10px] text-[#586e75] truncate max-w-[120px]">
@@ -99,7 +99,7 @@ export default function BottomAgentDock({ agents, selectedAgentId, onSelectAgent
                 {/* Bottom Meta Pill */}
                 <div className="mt-1 flex items-center gap-2">
                   <span className="text-[9px] font-pixel px-1.5 py-0.2 rounded border bg-[#eee8d5] border-[#b58900]/40 text-[#b58900] font-bold">
-                    {agent.aiModel.split(" ")[0]}
+                    {agent.harnessDomain}
                   </span>
                   <span className="text-[9px] text-[#586e75] flex items-center gap-0.5 font-bold">
                     ☕ x{agent.coffeeCups}

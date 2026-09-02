@@ -3,21 +3,21 @@ import { AgentsService } from './agents.service';
 import { AgentsController } from './agents.controller';
 import { MongooseModule } from '@nestjs/mongoose';
 import { EmailThread, EmailThreadSchema } from './schemas/email.schema';
-import { PamelaMillerService } from './employees/PamelaMiller.service';
-import { DerrickVanceService } from './employees/DerrickVance.service';
-import { JimmyHarperService } from './employees/JimmyHarper.service';
-import { StanHayesService } from './employees/StanHayes.service';
-import { RoryHowardService } from './employees/RoryHoward.service';
-import { AngelicaMartinService } from './employees/AngelicaMartin.service';
-import { TobiasHendersonService } from './employees/TobiasHenderson.service';
+import { SophiaChenService } from './employees/SophiaChen.service';
+import { VictorStoneService } from './employees/VictorStone.service';
+import { LucasBennettService } from './employees/LucasBennett.service';
+import { SamuelCrossService } from './employees/SamuelCross.service';
+import { RomanColeService } from './employees/RomanCole.service';
+import { AriaMorganService } from './employees/AriaMorgan.service';
+import { TylerReedService } from './employees/TylerReed.service';
 
-import { GenerateSocialMediaCalendar } from './graphs/pamela-miller/GenerateSocialMediaCalendar.service';
-import { ScoutGrantsAndCapital } from './graphs/derrick-vance/ScoutGrantsAndCapital.service';
-import { ExecuteBrowserPosting } from './graphs/jimmy-harper/ExecuteBrowserPosting.service';
-import { OptimizeFounderCalendar } from './graphs/stan-hayes/OptimizeFounderCalendar.service';
-import { ScoutTechEvents } from './graphs/rory-howard/ScoutTechEvents.service';
-import { AuditStartupBudget } from './graphs/angelica-martin/AuditStartupBudget.service';
-import { AuditSafetyGuardrails } from './graphs/tobias-henderson/AuditSafetyGuardrails.service';
+import { GenerateSocialMediaCalendar } from './graphs/sophia-chen/GenerateSocialMediaCalendar.service';
+import { ScoutGrantsAndCapital } from './graphs/victor-stone/ScoutGrantsAndCapital.service';
+import { ExecuteBrowserPosting } from './graphs/lucas-bennett/ExecuteBrowserPosting.service';
+import { OptimizeFounderCalendar } from './graphs/samuel-cross/OptimizeFounderCalendar.service';
+import { ScoutTechEvents } from './graphs/roman-cole/ScoutTechEvents.service';
+import { AuditStartupBudget } from './graphs/aria-morgan/AuditStartupBudget.service';
+import { AuditSafetyGuardrails } from './graphs/tyler-reed/AuditSafetyGuardrails.service';
 
 import { UseBrowser } from '../browser/use-browser.service';
 import { DeviceHookService } from '../browser/device-hook.service';
@@ -37,13 +37,13 @@ import { MemoryModule } from '../memory/memory.module';
   providers: [
     AgentsService,
     // Employees
-    PamelaMillerService,
-    DerrickVanceService,
-    JimmyHarperService,
-    StanHayesService,
-    RoryHowardService,
-    AngelicaMartinService,
-    TobiasHendersonService,
+    SophiaChenService,
+    VictorStoneService,
+    LucasBennettService,
+    SamuelCrossService,
+    RomanColeService,
+    AriaMorganService,
+    TylerReedService,
     // Graphs
     GenerateSocialMediaCalendar,
     ScoutGrantsAndCapital,
@@ -60,13 +60,13 @@ import { MemoryModule } from '../memory/memory.module';
   ],
   exports: [
     AgentsService,
-    PamelaMillerService,
-    DerrickVanceService,
-    JimmyHarperService,
-    StanHayesService,
-    RoryHowardService,
-    AngelicaMartinService,
-    TobiasHendersonService,
+    SophiaChenService,
+    VictorStoneService,
+    LucasBennettService,
+    SamuelCrossService,
+    RomanColeService,
+    AriaMorganService,
+    TylerReedService,
     DeviceHookService,
     UseBrowser,
   ],

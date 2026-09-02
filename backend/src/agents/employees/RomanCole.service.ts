@@ -1,6 +1,6 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
-import { AuditStartupBudget } from "../graphs/angelica-martin/AuditStartupBudget.service";
+import { ScoutTechEvents } from "../graphs/roman-cole/ScoutTechEvents.service";
 import z from "zod";
 import { tool } from "@langchain/core/tools";
 import { MemoryService } from "../../memory/memory.service";
@@ -9,11 +9,11 @@ import { AGENT_PERSONALITIES } from "../agent-personalities";
 import { EmailAgentDTO } from "../dto/create-email-agent.dto";
 
 @Injectable()
-export class AngelicaMartinService {
-  private readonly logger = new Logger(AngelicaMartinService.name);
+export class RomanColeService {
+  private readonly logger = new Logger(RomanColeService.name);
 
   constructor(
-    private readonly auditBudgetGraph: AuditStartupBudget,
+    private readonly scoutEventsGraph: ScoutTechEvents,
     private readonly memory: MemoryService,
     private readonly hindsightService: HindsightService,
   ) {}
@@ -22,36 +22,36 @@ export class AngelicaMartinService {
     model: "gemini-3.5-flash-lite",
   });
 
-  auditBudgetTool = tool(
+  scoutEventsTool = tool(
     async ({ query, session }) => {
-      this.logger.debug("Extracting Knowledge for Angelica Martin");
+      this.logger.debug("Extracting Knowledge for Roman Cole");
       const memories = await this.memory.recall(session, query);
-      this.logger.debug("Invoking AuditStartupBudget graph");
+      this.logger.debug("Invoking ScoutTechEvents graph");
 
-      return await this.auditBudgetGraph.graph.invoke({
+      return await this.scoutEventsGraph.graph.invoke({
         query,
         memories,
         session,
       });
     },
     {
-      name: "audit-startup-budget",
+      name: "scout-tech-events",
       description: `
-        Audit daily LLM API token spend, track startup monthly burn rate, and identify idle SaaS subscriptions to cancel ONLY when explicitly requested to audit budget or subscriptions.
+        Scout high-density VC networking socials, founder demo nights, and tech pitch competitions ONLY when explicitly asked to find events or socials.
 
-        DO NOT call this tool for casual conversation, general financial advice, questions about Angelica, small talk, or acknowledgments.
+        DO NOT call this tool for casual conversation, general questions about Roman, small talk, or acknowledgments.
       `,
       schema: z.object({
-        query: z.string().describe("User request to audit software budget or token spend"),
+        query: z.string().describe("User request to find networking events or demo nights"),
         session: z.string().describe("Active session name"),
       }),
     }
   );
 
-  modelWithTools = this.model.bindTools([this.auditBudgetTool]);
+  modelWithTools = this.model.bindTools([this.scoutEventsTool]);
 
   async runModel(email: EmailAgentDTO, sender: string, previousContext?: string, currentThreadId?: string) {
-    const personality = AGENT_PERSONALITIES["angelica-martin"];
+    const personality = AGENT_PERSONALITIES["roman-cole"];
 
     // Save user query in Hindsight only
     try {
@@ -59,7 +59,7 @@ export class AngelicaMartinService {
         await this.hindsightService.retain(
           sender,
           email.content,
-          "User Email Query & Preference for Angelica Martin"
+          "User Email Query & Preference for Roman Cole"
         );
       }
     } catch (e) {
@@ -75,7 +75,7 @@ export class AngelicaMartinService {
     } catch (_e) {}
 
     const prompt = `
-      You are Angelica Martin, Startup Budget Auditor & API Billing Bot.
+      You are Roman Cole, Local Meetups & Tech Event Scout.
       PERSONALITY: ${personality.personalitySummary}
       CAPABILITIES: ${personality.capabilities?.join("\n") ?? ""}
       PAST CONVERSATION: ${previousContext || "None"}
@@ -84,15 +84,15 @@ export class AngelicaMartinService {
       ${hindsightMemories ? JSON.stringify(hindsightMemories) : ""}
       USER REQUEST: ${email.content}
       SESSION NAME: ${sender}
-      Decide whether to use audit-startup-budget tool.
+      Decide whether to use scout-tech-events tool.
     `;
 
     const result = await this.modelWithTools.invoke(prompt);
     let toolResult: any = undefined;
 
     for (const call of result.tool_calls ?? []) {
-      if (call.name === "audit-startup-budget") {
-        const messageResult = await this.auditBudgetTool.invoke(call);
+      if (call.name === "scout-tech-events") {
+        const messageResult = await this.scoutEventsTool.invoke(call);
         let graphResult: any = messageResult;
         if (typeof messageResult?.content === "string") {
           try {
@@ -103,10 +103,10 @@ export class AngelicaMartinService {
         }
         toolResult = graphResult;
         await this.memory.save(sender, {
-          type: "budget-audit-result",
-          content: graphResult,
-          summary: `Financial audit executed: ${graphResult?.auditSummary || email.content}`,
-          producedBy: "angelica-martin",
+          type: "events-scout-result",
+          content: graphResult?.topEvents ?? [],
+          summary: `Tech events scout executed: ${email.content}`,
+          producedBy: "roman-cole",
         });
       }
     }
@@ -114,7 +114,7 @@ export class AngelicaMartinService {
     let finalPrompt: string;
     if (toolResult) {
       finalPrompt = `
-        You are Angelica Martin. Write a strict, frugal email reply summarizing the financial audit work.
+        You are Roman Cole. Write an upbeat, networking-focused email reply summarizing the event scout results.
         USER REQUEST: ${email.content}
         WORK RESULT: ${JSON.stringify(toolResult, null, 2)}
         USER PREFERENCES: ${JSON.stringify(userMemories)}
@@ -123,8 +123,8 @@ export class AngelicaMartinService {
       `;
     } else {
       finalPrompt = `
-        You are Angelica Martin, Startup Budget Auditor & API Billing Bot.
-        Write a precise, frugal email reply to the user's request.
+        You are Roman Cole, Local Meetups & Tech Event Scout.
+        Write an upbeat, tech-savvy email reply to the user's request.
         IMPORTANT: No tool was used for this request. Do not pretend work was performed.
         USER REQUEST: ${email.content}
         PAST CONVERSATION: ${previousContext || "None"}

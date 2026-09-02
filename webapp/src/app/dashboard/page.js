@@ -12,8 +12,8 @@ import RightAgentPanel from "@/components/office/RightAgentPanel";
 import BottomAgentDock from "@/components/office/BottomAgentDock";
 import MemoryKnowledgeModal from "@/components/office/MemoryKnowledgeModal";
 import ConferenceRoomModal from "@/components/office/ConferenceRoomModal";
-import DundieTracker from "@/components/office/DundieTracker";
-import MichaelScottOSModal from "@/components/office/MichaelScottOSModal";
+import AchievementTracker from "@/components/office/AchievementTracker";
+import ExecutiveCoPilotModal from "@/components/office/ExecutiveCoPilotModal";
 import { playRetroSound } from "@/lib/retroAudio";
 
 export default function DedicatedOfficeApp() {
@@ -23,8 +23,8 @@ export default function DedicatedOfficeApp() {
   const [selectedAgent, setSelectedAgent] = useState(null); // Unlocked on page load
   const [isMemoryOpen, setIsMemoryOpen] = useState(false);
   const [isConferenceOpen, setIsConferenceOpen] = useState(false);
-  const [isDundiesOpen, setIsDundiesOpen] = useState(false);
-  const [isMichaelOSOpen, setIsMichaelOSOpen] = useState(false);
+  const [isAchievementsOpen, setIsAchievementsOpen] = useState(false);
+  const [isAlexOSOpen, setIsAlexOSOpen] = useState(false);
 
   // Verify Better Auth user session and hit /api/user to check user details status
   useEffect(() => {
@@ -66,12 +66,12 @@ export default function DedicatedOfficeApp() {
     verifyUserSessionAndDetails();
   }, [router]);
 
-  // Handle agent selection & trigger Michael Scott Executive XP OS modal
+  // Handle agent selection & trigger Alex Rivera Executive XP OS modal
   const handleSelectAgent = (agent) => {
     setSelectedAgent(agent);
-    if (agent?.id === "michael") {
+    if (agent?.id === "alex") {
       playRetroSound("chime");
-      setIsMichaelOSOpen(true);
+      setIsAlexOSOpen(true);
     }
   };
 
@@ -139,13 +139,13 @@ export default function DedicatedOfficeApp() {
     );
   };
 
-  // Dundie Point Reward
+  // Achievement Point Reward
   const handleRewardAgent = (agentId) => {
     playRetroSound("chime");
     const agent = agents.find((a) => a.id === agentId);
-    toast.success(`🏆 Awarded +50 Dundie Points to ${agent?.name}!`);
+    toast.success(`🏆 Awarded +50 Achievement Points to ${agent?.name}!`);
     handleUpdateAgent(agentId, {
-      dundieScore: (agent?.dundieScore || 0) + 50
+      achievementScore: (agent?.achievementScore || 0) + 50
     });
   };
 
@@ -165,11 +165,11 @@ export default function DedicatedOfficeApp() {
   return (
     <div className="flex flex-col h-screen w-screen bg-[#fdf6e3] text-[#073642] font-mono overflow-hidden select-none">
       
-      {/* 1. TOP HEADER BAR: Knowledge, Memory (MemPalace), Conference, Dundies & Audio */}
+      {/* 1. TOP HEADER BAR: Knowledge, Memory (MemPalace), Conference, Achievements & Audio */}
       <TopHeaderBar
         onOpenMemory={() => setIsMemoryOpen(true)}
         onOpenConference={() => setIsConferenceOpen(true)}
-        onOpenDundies={() => setIsDundiesOpen(true)}
+        onOpenAchievements={() => setIsAchievementsOpen(true)}
         onTriggerCoffee={handleOfficeCoffeeBreak}
         onDispatchTask={handleDispatchTask}
       />
@@ -185,7 +185,7 @@ export default function DedicatedOfficeApp() {
             onSelectAgent={handleSelectAgent}
             onOpenConference={() => setIsConferenceOpen(true)}
             onTriggerCoffee={handleOfficeCoffeeBreak}
-            onOpenDundies={() => setIsDundiesOpen(true)}
+            onOpenAchievements={() => setIsAchievementsOpen(true)}
           />
         </div>
 
@@ -206,11 +206,11 @@ export default function DedicatedOfficeApp() {
         onSelectAgent={handleSelectAgent}
       />
 
-      {/* Modal 1: Michael Scott 90s CRT Monitor Windows XP OS */}
-      {isMichaelOSOpen && (
-        <MichaelScottOSModal
+      {/* Modal 1: Alex Rivera 90s CRT Monitor Windows XP OS */}
+      {isAlexOSOpen && (
+        <ExecutiveCoPilotModal
           agents={agents}
-          onClose={() => setIsMichaelOSOpen(false)}
+          onClose={() => setIsAlexOSOpen(false)}
           onDispatchTask={handleDispatchTask}
           onUpdateAgent={handleUpdateAgent}
         />
@@ -229,20 +229,20 @@ export default function DedicatedOfficeApp() {
         />
       )}
 
-      {/* Modal 4: Dundie Awards Leaderboard */}
-      {isDundiesOpen && (
+      {/* Modal 4: Achievement Awards Leaderboard */}
+      {isAchievementsOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 overflow-y-auto font-mono">
           <div className="w-full max-w-4xl">
             <div className="flex justify-end mb-2">
               <button
                 type="button"
-                onClick={() => setIsDundiesOpen(false)}
+                onClick={() => setIsAchievementsOpen(false)}
                 className="bg-[#24303e] text-white px-3 py-1 rounded font-pixel text-xs border border-[#2e3e50] cursor-pointer"
               >
-                Close Dundie Hall ✕
+                Close Achievement Hall ✕
               </button>
             </div>
-            <DundieTracker
+            <AchievementTracker
               agents={agents}
               onRewardAgent={handleRewardAgent}
             />

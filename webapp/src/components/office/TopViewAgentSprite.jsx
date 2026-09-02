@@ -13,7 +13,7 @@ export default function TopViewAgentSprite({
 }) {
   const getAgentConfig = () => {
     switch (agentId) {
-      case "michael":
+      case "alex":
         return {
           hair: "#1c1917",
           skin: "#fbcfe8",
@@ -22,7 +22,7 @@ export default function TopViewAgentSprite({
           detail: "#dc322f",
           shoes: "#073642"
         };
-      case "dwight":
+      case "victor":
         return {
           hair: "#78350f",
           skin: "#fde047",
@@ -31,7 +31,7 @@ export default function TopViewAgentSprite({
           detail: "#451a03",
           shoes: "#073642"
         };
-      case "jim":
+      case "lucas":
         return {
           hair: "#581c87",
           skin: "#fed7aa",
@@ -40,7 +40,7 @@ export default function TopViewAgentSprite({
           detail: "#0f172a",
           shoes: "#073642"
         };
-      case "pam":
+      case "sophia":
         return {
           hair: "#cb4b16",
           skin: "#fde68a",
@@ -49,7 +49,7 @@ export default function TopViewAgentSprite({
           detail: "#ffffff",
           shoes: "#073642"
         };
-      case "ryan":
+      case "roman":
         return {
           hair: "#073642",
           skin: "#fde047",
@@ -58,7 +58,7 @@ export default function TopViewAgentSprite({
           detail: "#f8fafc",
           shoes: "#073642"
         };
-      case "stanley":
+      case "samuel":
         return {
           hair: "#1c1917",
           skin: "#9a3412",
@@ -67,7 +67,7 @@ export default function TopViewAgentSprite({
           detail: "#94a3b8",
           shoes: "#073642"
         };
-      case "toby":
+      case "tyler":
         return {
           hair: "#92400e",
           skin: "#fde68a",
@@ -76,7 +76,7 @@ export default function TopViewAgentSprite({
           detail: "#1e3a8a",
           shoes: "#073642"
         };
-      case "angela":
+      case "aria":
         return {
           hair: "#b58900",
           skin: "#fef08a",
@@ -102,7 +102,7 @@ export default function TopViewAgentSprite({
   // Render character specific facial features (eyes, expression, glasses, hair style)
   const renderFace = () => {
     switch (agentId) {
-      case "michael":
+      case "alex":
         return (
           <g>
             <path d="M-10,-24 Q0,-32 10,-24 L10,-18 L-10,-18 Z" fill={cfg.hair} />
@@ -111,7 +111,7 @@ export default function TopViewAgentSprite({
             <path d="M-3,-9 Q0,-6 4,-9" stroke="#dc322f" strokeWidth="1" fill="none" />
           </g>
         );
-      case "dwight":
+      case "victor":
         return (
           <g>
             <path d="M-10,-22 C-5,-30 0,-24 0,-24 C0,-24 5,-30 10,-22 L10,-18 L-10,-18 Z" fill={cfg.hair} />
@@ -121,7 +121,7 @@ export default function TopViewAgentSprite({
             <line x1="-3" y1="-9" x2="3" y2="-9" stroke="#451a03" strokeWidth="1" />
           </g>
         );
-      case "jim":
+      case "lucas":
         return (
           <g>
             <path d="M-11,-23 Q0,-31 11,-23 L11,-17 L-11,-17 Z" fill={cfg.hair} />
@@ -130,7 +130,7 @@ export default function TopViewAgentSprite({
             <path d="M-3,-9 Q1,-6 4,-10" stroke="#073642" strokeWidth="1" fill="none" />
           </g>
         );
-      case "pam":
+      case "sophia":
         return (
           <g>
             <path d="M-12,-24 Q0,-32 12,-24 L13,-12 L-13,-12 Z" fill={cfg.hair} />
@@ -140,7 +140,7 @@ export default function TopViewAgentSprite({
             <path d="M-3,-9 Q0,-6 3,-9" stroke="#b58900" strokeWidth="1" fill="none" />
           </g>
         );
-      case "ryan":
+      case "roman":
         return (
           <g>
             <path d="M-10,-24 Q0,-31 10,-24 L10,-18 L-10,-18 Z" fill={cfg.hair} />
@@ -149,7 +149,7 @@ export default function TopViewAgentSprite({
             <line x1="-3" y1="-9" x2="3" y2="-9" stroke="#073642" strokeWidth="1" />
           </g>
         );
-      case "stanley":
+      case "samuel":
         return (
           <g>
             <path d="M-10,-20 Q0,-24 10,-20 L10,-16 L-10,-16 Z" fill={cfg.hair} />
@@ -158,7 +158,7 @@ export default function TopViewAgentSprite({
             <rect x="-4" y="-10" width="8" height="2.5" fill="#1c1917" rx="1" />
           </g>
         );
-      case "toby":
+      case "tyler":
         return (
           <g>
             <path d="M-9,-22 Q0,-26 9,-22 L9,-18 L-9,-18 Z" fill={cfg.hair} />
@@ -167,7 +167,7 @@ export default function TopViewAgentSprite({
             <line x1="-3" y1="-8" x2="3" y2="-8" stroke="#073642" strokeWidth="1" />
           </g>
         );
-      case "angela":
+      case "aria":
         return (
           <g>
             <circle cx="0" cy="-26" r="3.5" fill={cfg.hair} />
@@ -260,7 +260,7 @@ export default function TopViewAgentSprite({
       {/* Solarized Light Name Badge under character (Always upright) */}
       <div className="absolute -bottom-6 left-1/2 -translate-x-1/2 whitespace-nowrap bg-[#fdf6e3] text-[#073642] text-[9px] font-mono font-bold px-2 py-0.5 rounded border border-[#b58900] shadow flex items-center gap-1">
         <span>{name.split(" ")[0]}</span>
-        {agentId === "michael" && <span className="text-[8px]">👑</span>}
+        {agentId === "alex" && <span className="text-[8px]">👑</span>}
       </div>
     </div>
   );

@@ -84,42 +84,42 @@ function WaterCoolerGraphic() {
 
 // Agent Home Desk Coordinates & Door Waypoints
 const AGENT_LOCATIONS = {
-  michael: {
+  alex: {
     home: { x: 180, y: 150 },
     chair: { x: 180, y: 110 },
     door: { x: 230, y: 340 }
   },
-  pam: {
+  sophia: {
     home: { x: 140, y: 680 },
     chair: { x: 140, y: 730 },
     door: { x: 230, y: 500 }
   },
-  jim: {
+  lucas: {
     home: { x: 300, y: 680 },
     chair: { x: 300, y: 730 },
     door: { x: 230, y: 500 }
   },
-  dwight: {
+  victor: {
     home: { x: 560, y: 680 },
     chair: { x: 560, y: 730 },
     door: { x: 680, y: 500 }
   },
-  stanley: {
+  samuel: {
     home: { x: 720, y: 680 },
     chair: { x: 720, y: 730 },
     door: { x: 680, y: 500 }
   },
-  ryan: {
+  roman: {
     home: { x: 1000, y: 610 },
     chair: { x: 1000, y: 560 },
     door: { x: 1110, y: 500 }
   },
-  toby: {
+  tyler: {
     home: { x: 1000, y: 760 },
     chair: { x: 1000, y: 810 },
     door: { x: 1110, y: 500 }
   },
-  angela: {
+  aria: {
     home: { x: 1240, y: 680 },
     chair: { x: 1240, y: 730 },
     door: { x: 1110, y: 500 }
@@ -518,7 +518,7 @@ export default function TopViewOfficeFloor({
           <div className="absolute left-[40px] top-[40px] w-[360px] h-[300px] rounded-lg border-4 border-[#b58900] bg-[#fdf6e3]/90 p-3 shadow-xl flex flex-col justify-between">
             <div className="flex items-center justify-between border-b-2 border-[#b58900] pb-1">
               <span className="font-pixel text-[10px] text-[#b58900] font-bold flex items-center gap-1">
-                👑 EXECUTIVE SUITE — MICHAEL SCOTT
+                👑 EXECUTIVE SUITE — ALEX RIVERA
               </span>
               <span className="text-[9px] text-[#586e75] font-mono">Master Orchestrator</span>
             </div>
@@ -643,14 +643,14 @@ export default function TopViewOfficeFloor({
           <div className="absolute left-[40px] top-[500px] w-[400px] h-[360px] rounded-lg border-4 border-[#d33682] bg-[#fdf6e3]/90 p-3 shadow-xl flex flex-col justify-between">
             <div className="flex items-center justify-between border-b-2 border-[#d33682] pb-1">
               <span className="font-pixel text-[10px] text-[#d33682] font-bold">
-                📱 SOCIAL & BROWSER POD — PAM & JIM
+                📱 SOCIAL & BROWSER POD — SOPHIA & LUCAS
               </span>
               <span className="text-[9px] text-[#586e75] font-mono">2 Workstations</span>
             </div>
 
             <div className="grid grid-cols-2 gap-4 my-auto">
               <div className="bg-[#eee8d5] border border-[#d33682] p-2.5 rounded-lg text-center relative shadow">
-                <div className="font-pixel text-[9px] text-[#d33682] font-bold">Pam's Desk</div>
+                <div className="font-pixel text-[9px] text-[#d33682] font-bold">Sophia's Desk</div>
                 <div className="text-[8px] text-[#586e75] font-mono mt-1">Calendar & Artwork</div>
                 <div className="w-16 h-8 bg-[#073642] border border-[#d33682] rounded mx-auto mt-2 p-0.5">
                   <div className="w-full h-1 bg-[#d33682] rounded-[1px] animate-pulse" />
@@ -658,7 +658,7 @@ export default function TopViewOfficeFloor({
               </div>
 
               <div className="bg-[#eee8d5] border border-[#2aa198] p-2.5 rounded-lg text-center relative shadow">
-                <div className="font-pixel text-[9px] text-[#2aa198] font-bold">Jim's Desk</div>
+                <div className="font-pixel text-[9px] text-[#2aa198] font-bold">Lucas's Desk</div>
                 <div className="text-[8px] text-[#586e75] font-mono mt-1">Browser CDP Hook</div>
                 <div className="w-16 h-8 bg-[#073642] border border-[#2aa198] rounded mx-auto mt-2 p-0.5">
                   <div className="w-full h-1 bg-[#2aa198] rounded-[1px] animate-pulse" />
@@ -675,23 +675,23 @@ export default function TopViewOfficeFloor({
           <div className="absolute left-[480px] top-[500px] w-[420px] h-[360px] rounded-lg border-4 border-[#859900] bg-[#fdf6e3]/90 p-3 shadow-xl flex flex-col justify-between">
             <div className="flex items-center justify-between border-b-2 border-[#859900] pb-1">
               <span className="font-pixel text-[10px] text-[#859900] font-bold">
-                💰 CAPITAL & PLANNING — DWIGHT & STANLEY
+                💰 CAPITAL & PLANNING — VICTOR & SAMUEL
               </span>
               <span className="text-[9px] text-[#586e75] font-mono">Grants & Focus</span>
             </div>
 
             <div className="grid grid-cols-2 gap-4 my-auto">
               <div className="bg-[#eee8d5] border border-[#859900] p-2.5 rounded-lg text-center relative shadow">
-                <div className="font-pixel text-[9px] text-[#859900] font-bold">Dwight's Desk</div>
-                <div className="text-[8px] text-[#586e75] font-mono mt-1">Beet Jar & VC Grants</div>
+                <div className="font-pixel text-[9px] text-[#859900] font-bold">Victor's Desk</div>
+                <div className="text-[8px] text-[#586e75] font-mono mt-1">Non-Dilutive VC Grants</div>
                 <div className="w-16 h-8 bg-[#073642] border border-[#859900] rounded mx-auto mt-2 p-0.5">
                   <div className="w-full h-1 bg-[#859900] rounded-[1px] animate-pulse" />
                 </div>
               </div>
 
               <div className="bg-[#eee8d5] border border-[#268bd2] p-2.5 rounded-lg text-center relative shadow">
-                <div className="font-pixel text-[9px] text-[#268bd2] font-bold">Stanley's Desk</div>
-                <div className="text-[8px] text-[#586e75] font-mono mt-1">Crosswords & Pretzels</div>
+                <div className="font-pixel text-[9px] text-[#268bd2] font-bold">Samuel's Desk</div>
+                <div className="text-[8px] text-[#586e75] font-mono mt-1">Focus & Productivity</div>
                 <div className="w-16 h-8 bg-[#073642] border border-[#268bd2] rounded mx-auto mt-2 p-0.5">
                   <div className="w-full h-1 bg-[#268bd2] rounded-[1px] animate-pulse" />
                 </div>
@@ -707,22 +707,22 @@ export default function TopViewOfficeFloor({
           <div className="absolute left-[940px] top-[500px] w-[420px] h-[360px] rounded-lg border-4 border-[#6c71c4] bg-[#fdf6e3]/90 p-3 shadow-xl flex flex-col justify-between">
             <div className="flex items-center justify-between border-b-2 border-[#6c71c4] pb-1">
               <span className="font-pixel text-[10px] text-[#6c71c4] font-bold">
-                🤝 HR, SAFETY & AUDIT — RYAN, TOBY & ANGELA
+                🤝 HR, SAFETY & AUDIT — ROMAN, TYLER & ARIA
               </span>
               <span className="text-[9px] text-[#586e75] font-mono">3 Workstations</span>
             </div>
 
             <div className="grid grid-cols-3 gap-2 my-auto">
               <div className="bg-[#eee8d5] border border-[#6c71c4] p-2 rounded text-center shadow">
-                <div className="font-pixel text-[8px] text-[#6c71c4] font-bold">Ryan</div>
+                <div className="font-pixel text-[8px] text-[#6c71c4] font-bold">Roman</div>
                 <div className="text-[7px] text-[#586e75] font-mono">Meetups</div>
               </div>
               <div className="bg-[#eee8d5] border border-[#586e75] p-2 rounded text-center shadow">
-                <div className="font-pixel text-[8px] text-[#586e75] font-bold">Toby</div>
+                <div className="font-pixel text-[8px] text-[#586e75] font-bold">Tyler</div>
                 <div className="text-[7px] text-[#586e75] font-mono">HR Safety</div>
               </div>
               <div className="bg-[#eee8d5] border border-[#dc322f] p-2 rounded text-center shadow">
-                <div className="font-pixel text-[8px] text-[#dc322f] font-bold">Angela</div>
+                <div className="font-pixel text-[8px] text-[#dc322f] font-bold">Aria</div>
                 <div className="text-[7px] text-[#586e75] font-mono">Audit</div>
               </div>
             </div>

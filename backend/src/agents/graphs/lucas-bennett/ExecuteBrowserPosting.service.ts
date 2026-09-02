@@ -35,7 +35,7 @@ export class ExecuteBrowserPosting {
     this.logger.debug("Formatting post payload for browser publishing");
     const structuredModel = this.model.withStructuredOutput(this.postPreparationSchema);
     const payload = await structuredModel.invoke(`
-      You are Jimmy Harper, browser automation specialist.
+      You are Lucas Bennett, browser automation specialist.
       Prepare the exact caption and target platform to publish via the founder's authenticated Chrome session.
 
       User Query:

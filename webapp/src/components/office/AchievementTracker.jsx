@@ -3,9 +3,9 @@
 import { Award, Trophy, Star, Zap, Sparkles } from "lucide-react";
 import { playRetroSound } from "@/lib/retroAudio";
 
-export default function DundieTracker({ agents, onRewardAgent }) {
-  // Sort agents by Dundie Score
-  const sortedAgents = [...agents].sort((a, b) => b.dundieScore - a.dundieScore);
+export default function AchievementTracker({ agents, onRewardAgent }) {
+  // Sort agents by Achievement Score
+  const sortedAgents = [...agents].sort((a, b) => b.achievementScore - a.achievementScore);
   const topAgent = sortedAgents[0];
 
   return (
@@ -18,7 +18,7 @@ export default function DundieTracker({ agents, onRewardAgent }) {
           </div>
           <div>
             <h3 className="font-pixel text-xs text-foreground uppercase tracking-wide">
-              Annual Dundie Awards Hall of Fame
+              Annual Achievement Awards Hall of Fame
             </h3>
             <p className="text-[11px] text-muted-foreground">
               Recognizing extraordinary local agent performance & codebase contributions
@@ -51,7 +51,7 @@ export default function DundieTracker({ agents, onRewardAgent }) {
                   #{rank + 1} {rank === 0 ? "👑" : rank === 1 ? "🥈" : rank === 2 ? "🥉" : "⭐"}
                 </span>
                 <span className="font-pixel text-[10px] text-amber-500 font-bold">
-                  {agent.dundieScore} Pts
+                  {agent.achievementScore} Pts
                 </span>
               </div>
 
@@ -64,13 +64,13 @@ export default function DundieTracker({ agents, onRewardAgent }) {
                     {agent.name}
                   </div>
                   <div className="text-[10px] text-muted-foreground truncate max-w-[120px]">
-                    {agent.aiModel.split(" ")[0]}
+                    {agent.harnessDomain}
                   </div>
                 </div>
               </div>
 
               <div className="text-[10px] bg-background/80 px-2 py-1 rounded border border-border/60 text-amber-400/90 font-mono truncate">
-                {agent.dundieTitle}
+                {agent.achievementTitle}
               </div>
             </div>
 

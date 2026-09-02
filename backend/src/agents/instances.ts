@@ -115,11 +115,11 @@ import { AGENT_PERSONALITIES } from './agent-personalities';
 // AGENT FLEET: EMAIL & TASK PROMPTS FOR ALL FLEET AGENTS (COPYRIGHT-SAFE)
 // ============================================================================
 
-export const MarcusScottAgent: Agent = {
-  id: AGENT_PERSONALITIES['marcus-scott'].id,
-  name: AGENT_PERSONALITIES['marcus-scott'].name,
-  role: AGENT_PERSONALITIES['marcus-scott'].title,
-  systemPrompt: AGENT_PERSONALITIES['marcus-scott'].systemPromptTemplate,
+export const AlexRiveraAgent: Agent = {
+  id: AGENT_PERSONALITIES['alex-rivera'].id,
+  name: AGENT_PERSONALITIES['alex-rivera'].name,
+  role: AGENT_PERSONALITIES['alex-rivera'].title,
+  systemPrompt: AGENT_PERSONALITIES['alex-rivera'].systemPromptTemplate,
   generatePrompt(canvasData: LeanCanvasOutput | any) {
     const rawCanvasJson = typeof canvasData === 'string' ? canvasData : JSON.stringify(canvasData, null, 2);
     return `${this.systemPrompt}
@@ -129,15 +129,15 @@ Here is the founder's raw Lean Canvas JSON file:
 ${rawCanvasJson}
 \`\`\`
 
-Analyze the raw Lean Canvas file above. Generate a warm introductory email from ${this.name} (${AGENT_PERSONALITIES['marcus-scott'].email}) greeting the founder, stating your role as ${this.role}, and explaining what you can do for them based on their raw Lean Canvas data. Signature Quirk: "${AGENT_PERSONALITIES['marcus-scott'].signatureQuirk}".`;
+Analyze the raw Lean Canvas file above. Generate a warm introductory email from ${this.name} (${AGENT_PERSONALITIES['alex-rivera'].email}) greeting the founder, stating your role as ${this.role}, and explaining what you can do for them based on their raw Lean Canvas data. Signature Quirk: "${AGENT_PERSONALITIES['alex-rivera'].signatureQuirk}".`;
   },
 };
 
-export const PamelaMillerAgent: Agent = {
-  id: AGENT_PERSONALITIES['pamela-miller'].id,
-  name: AGENT_PERSONALITIES['pamela-miller'].name,
-  role: AGENT_PERSONALITIES['pamela-miller'].title,
-  systemPrompt: AGENT_PERSONALITIES['pamela-miller'].systemPromptTemplate,
+export const SophiaChenAgent: Agent = {
+  id: AGENT_PERSONALITIES['sophia-chen'].id,
+  name: AGENT_PERSONALITIES['sophia-chen'].name,
+  role: AGENT_PERSONALITIES['sophia-chen'].title,
+  systemPrompt: AGENT_PERSONALITIES['sophia-chen'].systemPromptTemplate,
   generatePrompt(canvasData: LeanCanvasOutput | any) {
     const rawCanvasJson = typeof canvasData === 'string' ? canvasData : JSON.stringify(canvasData, null, 2);
     return `${this.systemPrompt}
@@ -147,15 +147,15 @@ Here is the founder's raw Lean Canvas JSON file:
 ${rawCanvasJson}
 \`\`\`
 
-Analyze the raw Lean Canvas file above (problem, solution, unique value proposition, customer segments). Generate an introductory email from ${this.name} (${AGENT_PERSONALITIES['pamela-miller'].email}) greeting the founder, stating your role as ${this.role}, and explaining how you design 7-day social story content and post banners based on their raw Lean Canvas.`;
+Analyze the raw Lean Canvas file above (problem, solution, unique value proposition, customer segments). Generate an introductory email from ${this.name} (${AGENT_PERSONALITIES['sophia-chen'].email}) greeting the founder, stating your role as ${this.role}, and explaining how you design 7-day social story content and post banners based on their raw Lean Canvas.`;
   },
 };
 
-export const JimmyHarperAgent: Agent = {
-  id: AGENT_PERSONALITIES['jimmy-harper'].id,
-  name: AGENT_PERSONALITIES['jimmy-harper'].name,
-  role: AGENT_PERSONALITIES['jimmy-harper'].title,
-  systemPrompt: AGENT_PERSONALITIES['jimmy-harper'].systemPromptTemplate,
+export const LucasBennettAgent: Agent = {
+  id: AGENT_PERSONALITIES['lucas-bennett'].id,
+  name: AGENT_PERSONALITIES['lucas-bennett'].name,
+  role: AGENT_PERSONALITIES['lucas-bennett'].title,
+  systemPrompt: AGENT_PERSONALITIES['lucas-bennett'].systemPromptTemplate,
   generatePrompt(canvasData: LeanCanvasOutput | any) {
     const rawCanvasJson = typeof canvasData === 'string' ? canvasData : JSON.stringify(canvasData, null, 2);
     return `${this.systemPrompt}
@@ -165,15 +165,15 @@ Here is the founder's raw Lean Canvas JSON file:
 ${rawCanvasJson}
 \`\`\`
 
-Analyze the raw Lean Canvas file above (channels, customer segments). Generate an introductory email from ${this.name} (${AGENT_PERSONALITIES['jimmy-harper'].email}) greeting the founder, stating your role as ${this.role}, and explaining how you execute headless Playwright CDP browser sessions on port 9222 to post updates with zero API keys required.`;
+Analyze the raw Lean Canvas file above (channels, customer segments). Generate an introductory email from ${this.name} (${AGENT_PERSONALITIES['lucas-bennett'].email}) greeting the founder, stating your role as ${this.role}, and explaining how you execute headless Playwright CDP browser sessions on port 9222 to post updates with zero API keys required.`;
   },
 };
 
-export const DerrickVanceAgent: Agent = {
-  id: AGENT_PERSONALITIES['derrick-vance'].id,
-  name: AGENT_PERSONALITIES['derrick-vance'].name,
-  role: AGENT_PERSONALITIES['derrick-vance'].title,
-  systemPrompt: AGENT_PERSONALITIES['derrick-vance'].systemPromptTemplate,
+export const VictorStoneAgent: Agent = {
+  id: AGENT_PERSONALITIES['victor-stone'].id,
+  name: AGENT_PERSONALITIES['victor-stone'].name,
+  role: AGENT_PERSONALITIES['victor-stone'].title,
+  systemPrompt: AGENT_PERSONALITIES['victor-stone'].systemPromptTemplate,
   generatePrompt(canvasData: LeanCanvasOutput | any) {
     const rawCanvasJson = typeof canvasData === 'string' ? canvasData : JSON.stringify(canvasData, null, 2);
     return `${this.systemPrompt}
@@ -183,15 +183,15 @@ Here is the founder's raw Lean Canvas JSON file:
 ${rawCanvasJson}
 \`\`\`
 
-Analyze the raw Lean Canvas file above (problem, solution, cost structure, unfair advantage). Generate an urgent email from ${this.name} (${AGENT_PERSONALITIES['derrick-vance'].email}) greeting the founder ("FOUNDER / MANAGER"), stating your role as ${this.role}, and explaining how you scout $100K NSF innovation grants and cloud credits matching their raw Lean Canvas.`;
+Analyze the raw Lean Canvas file above (problem, solution, cost structure, unfair advantage). Generate an urgent email from ${this.name} (${AGENT_PERSONALITIES['victor-stone'].email}) greeting the founder ("FOUNDER / MANAGER"), stating your role as ${this.role}, and explaining how you scout $100K NSF innovation grants and cloud credits matching their raw Lean Canvas.`;
   },
 };
 
-export const StanHayesAgent: Agent = {
-  id: AGENT_PERSONALITIES['stan-hayes'].id,
-  name: AGENT_PERSONALITIES['stan-hayes'].name,
-  role: AGENT_PERSONALITIES['stan-hayes'].title,
-  systemPrompt: AGENT_PERSONALITIES['stan-hayes'].systemPromptTemplate,
+export const SamuelCrossAgent: Agent = {
+  id: AGENT_PERSONALITIES['samuel-cross'].id,
+  name: AGENT_PERSONALITIES['samuel-cross'].name,
+  role: AGENT_PERSONALITIES['samuel-cross'].title,
+  systemPrompt: AGENT_PERSONALITIES['samuel-cross'].systemPromptTemplate,
   generatePrompt(canvasData: LeanCanvasOutput | any) {
     const rawCanvasJson = typeof canvasData === 'string' ? canvasData : JSON.stringify(canvasData, null, 2);
     return `${this.systemPrompt}
@@ -201,15 +201,15 @@ Here is the founder's raw Lean Canvas JSON file:
 ${rawCanvasJson}
 \`\`\`
 
-Analyze the raw Lean Canvas file above (key metrics, channels). Generate a direct schedule email from ${this.name} (${AGENT_PERSONALITIES['stan-hayes'].email}) greeting the founder concisely, stating your role as ${this.role}, and explaining how you protect 4-hour deep work focus blocks and decline unnecessary sales meetings.`;
+Analyze the raw Lean Canvas file above (key metrics, channels). Generate a direct schedule email from ${this.name} (${AGENT_PERSONALITIES['samuel-cross'].email}) greeting the founder concisely, stating your role as ${this.role}, and explaining how you protect 4-hour deep work focus blocks and decline unnecessary sales meetings.`;
   },
 };
 
-export const RoryHowardAgent: Agent = {
-  id: AGENT_PERSONALITIES['rory-howard'].id,
-  name: AGENT_PERSONALITIES['rory-howard'].name,
-  role: AGENT_PERSONALITIES['rory-howard'].title,
-  systemPrompt: AGENT_PERSONALITIES['rory-howard'].systemPromptTemplate,
+export const RomanColeAgent: Agent = {
+  id: AGENT_PERSONALITIES['roman-cole'].id,
+  name: AGENT_PERSONALITIES['roman-cole'].name,
+  role: AGENT_PERSONALITIES['roman-cole'].title,
+  systemPrompt: AGENT_PERSONALITIES['roman-cole'].systemPromptTemplate,
   generatePrompt(canvasData: LeanCanvasOutput | any) {
     const rawCanvasJson = typeof canvasData === 'string' ? canvasData : JSON.stringify(canvasData, null, 2);
     return `${this.systemPrompt}
@@ -219,15 +219,15 @@ Here is the founder's raw Lean Canvas JSON file:
 ${rawCanvasJson}
 \`\`\`
 
-Analyze the raw Lean Canvas file above (customer segments, channels). Generate a networking email from ${this.name} (${AGENT_PERSONALITIES['rory-howard'].email}) greeting the founder, stating your role as ${this.role}, and detailing how you crawl high-density VC networking socials, founder meetups, and demo nights matching their startup domain.`;
+Analyze the raw Lean Canvas file above (customer segments, channels). Generate a networking email from ${this.name} (${AGENT_PERSONALITIES['roman-cole'].email}) greeting the founder, stating your role as ${this.role}, and detailing how you crawl high-density VC networking socials, founder meetups, and demo nights matching their startup domain.`;
   },
 };
 
-export const TobiasHendersonAgent: Agent = {
-  id: AGENT_PERSONALITIES['tobias-henderson'].id,
-  name: AGENT_PERSONALITIES['tobias-henderson'].name,
-  role: AGENT_PERSONALITIES['tobias-henderson'].title,
-  systemPrompt: AGENT_PERSONALITIES['tobias-henderson'].systemPromptTemplate,
+export const TylerReedAgent: Agent = {
+  id: AGENT_PERSONALITIES['tyler-reed'].id,
+  name: AGENT_PERSONALITIES['tyler-reed'].name,
+  role: AGENT_PERSONALITIES['tyler-reed'].title,
+  systemPrompt: AGENT_PERSONALITIES['tyler-reed'].systemPromptTemplate,
   generatePrompt(canvasData: LeanCanvasOutput | any) {
     const rawCanvasJson = typeof canvasData === 'string' ? canvasData : JSON.stringify(canvasData, null, 2);
     return `${this.systemPrompt}
@@ -237,15 +237,15 @@ Here is the founder's raw Lean Canvas JSON file:
 ${rawCanvasJson}
 \`\`\`
 
-Analyze the raw Lean Canvas file above. Generate a safety & compliance email from ${this.name} (${AGENT_PERSONALITIES['tobias-henderson'].email}) greeting the founder politely, stating your role as ${this.role}, and explaining how you monitor 3.4s human delays, rate limits, and zero shadowban compliance.`;
+Analyze the raw Lean Canvas file above. Generate a safety & compliance email from ${this.name} (${AGENT_PERSONALITIES['tyler-reed'].email}) greeting the founder politely, stating your role as ${this.role}, and explaining how you monitor 3.4s human delays, rate limits, and zero shadowban compliance.`;
   },
 };
 
-export const AngelicaMartinAgent: Agent = {
-  id: AGENT_PERSONALITIES['angelica-martin'].id,
-  name: AGENT_PERSONALITIES['angelica-martin'].name,
-  role: AGENT_PERSONALITIES['angelica-martin'].title,
-  systemPrompt: AGENT_PERSONALITIES['angelica-martin'].systemPromptTemplate,
+export const AriaMorganAgent: Agent = {
+  id: AGENT_PERSONALITIES['aria-morgan'].id,
+  name: AGENT_PERSONALITIES['aria-morgan'].name,
+  role: AGENT_PERSONALITIES['aria-morgan'].title,
+  systemPrompt: AGENT_PERSONALITIES['aria-morgan'].systemPromptTemplate,
   generatePrompt(canvasData: LeanCanvasOutput | any) {
     const rawCanvasJson = typeof canvasData === 'string' ? canvasData : JSON.stringify(canvasData, null, 2);
     return `${this.systemPrompt}
@@ -255,19 +255,19 @@ Here is the founder's raw Lean Canvas JSON file:
 ${rawCanvasJson}
 \`\`\`
 
-Analyze the raw Lean Canvas file above (cost structure, revenue streams). Generate a budget audit email from ${this.name} (${AGENT_PERSONALITIES['angelica-martin'].email}) greeting the founder formally, stating your role as ${this.role}, and detailing how you audit daily API token spend, track burn rate, and cancel unused SaaS subscriptions.`;
+Analyze the raw Lean Canvas file above (cost structure, revenue streams). Generate a budget audit email from ${this.name} (${AGENT_PERSONALITIES['aria-morgan'].email}) greeting the founder formally, stating your role as ${this.role}, and detailing how you audit daily API token spend, track burn rate, and cancel unused SaaS subscriptions.`;
   },
 };
 
 export const ALL_AGENT_INSTANCES: Agent[] = [
-  MarcusScottAgent,
-  PamelaMillerAgent,
-  JimmyHarperAgent,
-  DerrickVanceAgent,
-  StanHayesAgent,
-  RoryHowardAgent,
-  TobiasHendersonAgent,
-  AngelicaMartinAgent,
+  AlexRiveraAgent,
+  SophiaChenAgent,
+  LucasBennettAgent,
+  VictorStoneAgent,
+  SamuelCrossAgent,
+  RomanColeAgent,
+  TylerReedAgent,
+  AriaMorganAgent,
 ];
 
 

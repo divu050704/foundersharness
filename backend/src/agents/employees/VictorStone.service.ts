@@ -1,6 +1,6 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
-import { ScoutGrantsAndCapital } from "../graphs/derrick-vance/ScoutGrantsAndCapital.service";
+import { ScoutGrantsAndCapital } from "../graphs/victor-stone/ScoutGrantsAndCapital.service";
 import z from "zod";
 import { tool } from "@langchain/core/tools";
 import { MemoryService } from "../../memory/memory.service";
@@ -9,8 +9,8 @@ import { AGENT_PERSONALITIES } from "../agent-personalities";
 import { EmailAgentDTO } from "../dto/create-email-agent.dto";
 
 @Injectable()
-export class DerrickVanceService {
-  private readonly logger = new Logger(DerrickVanceService.name);
+export class VictorStoneService {
+  private readonly logger = new Logger(VictorStoneService.name);
 
   constructor(
     private readonly scoutGrantsGraph: ScoutGrantsAndCapital,
@@ -24,7 +24,7 @@ export class DerrickVanceService {
 
   scoutGrantsTool = tool(
     async ({ query, session }) => {
-      this.logger.debug("Extracting Knowledge for Derrick Vance");
+      this.logger.debug("Extracting Knowledge for Victor Stone");
       const memories = await this.memory.recall(session, query);
       this.logger.debug("Invoking ScoutGrantsAndCapital graph");
 
@@ -39,7 +39,7 @@ export class DerrickVanceService {
       description: `
         Scout non-dilutive $100K+ grants, NSF SBIR awards, and AWS/GCP cloud credits ONLY when explicitly requested to search for grants or funding.
 
-        DO NOT call this tool for casual conversation, general financial advice, questions about Derrick Vance, small talk, or acknowledgments.
+        DO NOT call this tool for casual conversation, general financial advice, questions about Victor Stone, small talk, or acknowledgments.
       `,
       schema: z.object({
         query: z.string().describe("User request to scout grants or cloud credits"),
@@ -51,7 +51,7 @@ export class DerrickVanceService {
   modelWithTools = this.model.bindTools([this.scoutGrantsTool]);
 
   async runModel(email: EmailAgentDTO, sender: string, previousContext?: string, currentThreadId?: string) {
-    const personality = AGENT_PERSONALITIES["derrick-vance"];
+    const personality = AGENT_PERSONALITIES["victor-stone"];
 
     // Save user query in Hindsight only
     try {
@@ -59,7 +59,7 @@ export class DerrickVanceService {
         await this.hindsightService.retain(
           sender,
           email.content,
-          "User Email Query & Preference for Derrick Vance"
+          "User Email Query & Preference for Victor Stone"
         );
       }
     } catch (e) {
@@ -75,7 +75,7 @@ export class DerrickVanceService {
     } catch (_e) {}
 
     const prompt = `
-      You are Derrick Vance, Capital, Grants & VC Investment Scout.
+      You are Victor Stone, Capital, Grants & VC Investment Scout.
       PERSONALITY: ${personality.personalitySummary}
       CAPABILITIES: ${personality.capabilities?.join("\n") ?? ""}
       PAST CONVERSATION: ${previousContext || "None"}
@@ -106,7 +106,7 @@ export class DerrickVanceService {
           type: "grant-scout-result",
           content: graphResult?.grants ?? [],
           summary: `Grant scout executed: ${graphResult?.summary || email.content}`,
-          producedBy: "derrick-vance",
+          producedBy: "victor-stone",
         });
       }
     }
@@ -114,7 +114,7 @@ export class DerrickVanceService {
     let finalPrompt: string;
     if (toolResult) {
       finalPrompt = `
-        You are Derrick Vance. Write an intense, disciplined email reply summarizing the grant scout work.
+        You are Victor Stone. Write an intense, disciplined email reply summarizing the grant scout work.
         USER REQUEST: ${email.content}
         WORK RESULT: ${JSON.stringify(toolResult, null, 2)}
         USER PREFERENCES: ${JSON.stringify(userMemories)}
@@ -123,7 +123,7 @@ export class DerrickVanceService {
       `;
     } else {
       finalPrompt = `
-        You are Derrick Vance, Capital, Grants & VC Investment Scout.
+        You are Victor Stone, Capital, Grants & VC Investment Scout.
         Write a direct, zero-nonsense email reply to the user's request.
         IMPORTANT: No tool was used for this request. Do not pretend work was performed.
         USER REQUEST: ${email.content}
