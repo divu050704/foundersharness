@@ -6,11 +6,12 @@ import { LeanCanvasAgent } from "./instances";
 import { LeanCanvasSchema } from "./schema";
 import type { LeanCanvasOutput } from "./schema";
 import { Model } from "mongoose";
-import { EmailAgentDTO } from "./dto/email-agent.dto";
+import { EmailAgentDTO } from "./dto/create-email-agent.dto";
 import { InjectModel } from "@nestjs/mongoose";
 import { AGENT_PERSONALITIES } from "./agent-personalities";
 import { EmailThread } from "./schemas/email.schema";
 import { PamelaMillerService } from "./employees/PamelaMiller.service";
+import { UpdateEmailAgentDTO } from "./dto/update-email-agent.dto";
 
 
 @Injectable()
@@ -46,37 +47,99 @@ export class AgentsService {
     return output;
   }
 
-  async saveEmail(email: EmailAgentDTO, sender: string) {
+  async saveEmail(email: UpdateEmailAgentDTO, sender: string) {
     const isAgentSender = sender.includes('@foundersharness.ai') || sender.includes('@dundermifflin.com');
 
-    const createEmailThread = new this.emailModel({
-      emails: [{
+    const newEmail = {
         attachments: email.attachments || [],
         content: email.content,
         read: false,
         receiver: email.receiver,
         sender: sender
-      }],
+    };
+
+    if (email.threadId) {
+      const thread = await this.emailModel.findById(email.threadId);
+      if (thread) {
+        thread.emails = thread.emails || [];
+        thread.emails.push(newEmail as any);
+        return await thread.save();
+      }
+    }
+
+    const createEmailThread = new this.emailModel({
+      emails: [newEmail],
       subject: email.subject,
       agent: isAgentSender ? sender : email.receiver
-    })
-    return await createEmailThread.save()
+    });
+    return await createEmailThread.save();
   }
 
-  async initiateAgent(email: EmailAgentDTO, sender: string) {
-    const prompt = `
-    Make use of available tools and answer the user's query based on your personality
-    Personality: ${AGENT_PERSONALITIES['pamela-miller'].personalitySummary}
-    Query: ${email.content}
-    Session Name: ${sender}
-    `
-    const result = await this.pamelaMiller.modelWithTools.invoke(prompt)
-    for (const call of result.tool_calls ?? []) {
-      if (call.name === "create-calendar") {
-        const toolResult = await this.pamelaMiller.createCalendarTool.invoke(call);
-        console.log(toolResult.content)
-        // do something with toolResult — save it, feed it back to the model, etc.
+  async replyAgent(email: EmailAgentDTO, sender: string) {
+    console.log(email.receiver)
+    let previousContext = "";
+    let currentThreadId = email.threadId;
+
+    if (currentThreadId) {
+      const thread = await this.emailModel.findById(currentThreadId).exec();
+      if (thread && thread.emails) {
+        previousContext = thread.emails
+          .map(e => `From: ${e.sender}\nTo: ${e.receiver}\nContent: ${e.content}`)
+          .join("\n\n---\n\n");
       }
+
+      await this.emailModel.findByIdAndUpdate(
+        currentThreadId,
+        {
+          $push: {
+            emails: {
+              content: email.content,
+              sender: sender,
+              receiver: email.receiver,
+              read: false,
+              attachments: email.attachments || [],
+            }
+          }
+        }
+      ).exec();
+    } else {
+      const newThread = new this.emailModel({
+        subject: email.subject || "New Conversation",
+        agent: email.receiver,
+        emails: [{
+          content: email.content,
+          sender: sender,
+          receiver: email.receiver,
+          read: false,
+          attachments: email.attachments || [],
+        }]
+      });
+      const savedThread = await newThread.save();
+      currentThreadId = savedThread._id.toString();
+    }
+
+    if (email.receiver === "pamela.miller@foundersharness.ai") {
+      const reply = await this.pamelaMiller.runModel(email, sender, previousContext)
+      
+      if (currentThreadId) {
+        await this.emailModel.findByIdAndUpdate(
+          currentThreadId,
+          {
+            $push: {
+              emails: {
+                content: reply,
+                sender: "pamela.miller@foundersharness.ai",
+                receiver: sender,
+                read: false,
+                attachments: [],
+              }
+            }
+          }
+        ).exec();
+      }
+
+      return { reply }
+
     }
   }
 

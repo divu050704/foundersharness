@@ -55,6 +55,7 @@ export class GenerateSocialMediaCalendar {
                 Visit the user's social media profile and retrieve up to 5 of their most recent published posts.
                 For each post, collect the available text or caption content. The purpose of retrieving these posts is to understand the user's existing content strategy, writing style, recurring themes, positioning, and topics that have already been covered.
                 The retrieved posts will be used to create a new social media calendar, so accurately capture the actual published content and avoid inventing information that is not visible on the profile.
+                IMPORTANT: The posts should be only of the user, figure out the account name from the context provided.
                 User's request:
                 ${state.query}
             `,

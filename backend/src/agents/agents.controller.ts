@@ -9,16 +9,16 @@ import {
 import { AgentsService } from './agents.service';
 import { Session } from '@thallesp/nestjs-better-auth';
 import type { UserSession } from '@thallesp/nestjs-better-auth';
-import { EmailAgentDTO } from './dto/email-agent.dto';
+import { EmailAgentDTO } from './dto/create-email-agent.dto';
 
 @Controller('agents')
 export class AgentsController {
   constructor(private readonly agentsService: AgentsService) {}
   
-  @Post("send-email")
-  async sendEmail(@Session() session: UserSession, @Body() email: EmailAgentDTO){
+  @Post("reply-email")
+  async replyEmail(@Session() session: UserSession, @Body() email: EmailAgentDTO){
     const senderEmail = session?.user?.email || "founder@harness.io";
-    return await this.agentsService.initiateAgent(email, senderEmail);
+    return await this.agentsService.replyAgent(email, senderEmail);
   }
 
   @Get("threads")
