@@ -14,12 +14,16 @@ import { PamelaMillerService } from "./employees/PamelaMiller.service";
 import { UpdateEmailAgentDTO } from "./dto/update-email-agent.dto";
 
 
+import { InjectQueue } from "@nestjs/bullmq";
+import { Queue } from "bullmq";
+
 @Injectable()
 export class AgentsService {
+
   constructor(
     @InjectModel(EmailThread.name) private emailModel: Model<EmailThread>,
-    private readonly logger: Logger,
-    private readonly pamelaMiller: PamelaMillerService,
+    @InjectQueue('agent-tasks') private readonly agentQueue: Queue,
+    private readonly logger: Logger
   ) { }
   private model = new ChatGoogleGenerativeAI({
     apiKey: process.env.GEMINI_API_KEY,
@@ -118,29 +122,30 @@ export class AgentsService {
       currentThreadId = savedThread._id.toString();
     }
 
-    if (email.receiver === "pamela.miller@foundersharness.ai") {
-      const reply = await this.pamelaMiller.runModel(email, sender, previousContext)
-      
-      if (currentThreadId) {
-        await this.emailModel.findByIdAndUpdate(
-          currentThreadId,
-          {
-            $push: {
-              emails: {
-                content: reply,
-                sender: "pamela.miller@foundersharness.ai",
-                receiver: sender,
-                read: false,
-                attachments: [],
-              }
-            }
-          }
-        ).exec();
-      }
+    const agentJobMap: Record<string, string> = {
+      "pamela.miller@foundersharness.ai": "process-pamela-miller",
+      "derrick.vance@foundersharness.ai": "process-derrick-vance",
+      "jimmy.harper@foundersharness.ai": "process-jimmy-harper",
+      "stan.hayes@foundersharness.ai": "process-stan-hayes",
+      "rory.howard@foundersharness.ai": "process-rory-howard",
+      "angelica.martin@foundersharness.ai": "process-angelica-martin",
+      "tobias.henderson@foundersharness.ai": "process-tobias-henderson",
+    };
 
-      return { reply }
+    const jobName = agentJobMap[email.receiver.toLowerCase()] || "process-pamela-miller";
 
-    }
+    await this.agentQueue.add(jobName, {
+      email,
+      sender,
+      previousContext,
+      currentThreadId,
+    });
+
+    this.logger.log(`Enqueued ${jobName} job to BullMQ for thread ${currentThreadId}`);
+
+    return { reply: "I have initiated the process, will get back whenever it is completed" };
+
+    
   }
 
   async getEmailThreads(): Promise<EmailThread[]> {

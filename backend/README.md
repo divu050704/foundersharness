@@ -1,98 +1,132 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# Founders Harness — Backend API & AI Engine 🧠
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+The **Founders Harness Backend** is a NestJS application built to power autonomous AI executive agents, long-term memory graph storage, asynchronous task queues, and browser automation pipelines. It leverages **LangChain**, **LangGraph**, **BullMQ**, **Google Gemini**, **MongoDB**, **Redis**, and the **Hindsight Memory Engine**.
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+---
 
-## Description
+## 🏗️ Architecture & Modules
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+The backend service is structured into modular domains:
 
-## Project setup
-
-```bash
-$ npm install
+```
+src/
+├── agents/                      # Multi-Agent Framework & Execution Graphs
+│   ├── employees/               # Employee service classes (Pamela, Derrick, Jimmy, Stan, Rory, Angelica, Tobias)
+│   │   ├── PamelaMiller.service.ts
+│   │   ├── DerrickVance.service.ts
+│   │   ├── JimmyHarper.service.ts
+│   │   ├── StanHayes.service.ts
+│   │   ├── RoryHoward.service.ts
+│   │   ├── AngelicaMartin.service.ts
+│   │   └── TobiasHenderson.service.ts
+│   ├── graphs/                  # LangGraph state machine executables per agent
+│   │   ├── pamela-miller/       # GenerateSocialMediaCalendar.service.ts
+│   │   ├── derrick-vance/       # ScoutGrantsAndCapital.service.ts
+│   │   ├── jimmy-harper/        # ExecuteBrowserPosting.service.ts
+│   │   ├── stan-hayes/          # OptimizeFounderCalendar.service.ts
+│   │   ├── rory-howard/         # ScoutTechEvents.service.ts
+│   │   ├── angelica-martin/     # AuditStartupBudget.service.ts
+│   │   └── tobias-henderson/    # AuditSafetyGuardrails.service.ts
+│   ├── agent-task.processor.ts  # BullMQ background worker task processor
+│   ├── agent-personalities.ts   # Personality traits & capabilities matrix
+│   ├── agents.service.ts        # Agent dispatcher & thread manager
+│   └── agents.module.ts         # Module wiring & provider exports
+├── memory/                      # Persistent Memory & Knowledge Layer
+│   ├── hindsight.service.ts     # Integration with Hindsight vector bank engine
+│   └── memory.service.ts        # MongoDB store for agent task results
+├── onboarding/                  # Startup Onboarding & Lean Canvas Ingestion
+└── browser/                     # Browser Control & DeviceHook Bridge
+    ├── use-browser.service.ts   # LangGraph browser automation pipeline
+    └── device-hook.service.ts   # WebSocket relay server (ws://localhost:5001)
 ```
 
-## Compile and run the project
+---
 
-```bash
-# development
-$ npm run start
+## ⚡ Major Functions & Capabilities
 
-# watch mode
-$ npm run start:dev
+### 1. Multi-Agent Fleet & Dual-Path Query Handling
+- **7 Specialized AI Employees**:
+  - **Pamela Miller**: Social Media Strategist (`create-calendar` tool).
+  - **Derrick Vance**: Capital & VC Grant Scout (`scout-grants-capital` tool).
+  - **Jimmy Harper**: Stealth Browser Automation Specialist (`execute-browser-posting` tool).
+  - **Stan Hayes**: Day Planner & Focus Time Manager (`optimize-founder-calendar` tool).
+  - **Rory Howard**: Tech Event & Social Scout (`scout-tech-events` tool).
+  - **Angelica Martin**: Startup Budget & Billing Auditor (`audit-startup-budget` tool).
+  - **Tobias Henderson**: HR & Safety Officer (`audit-safety-guardrails` tool).
+- **Dual-Path Reply Engine**: Tool execution path for actionable requests vs conversational path for general questions/small talk without claiming unperformed work.
 
-# production mode
-$ npm run start:prod
+### 2. Asynchronous Queue Processing (BullMQ + Redis)
+- **Non-Blocking Dispatch**: Incoming emails received via `POST /api/agents/reply-email` are enqueued directly to BullMQ queue `'agent-tasks'`.
+- **Background Task Processor**: `AgentTaskProcessor` worker processes jobs (`process-pamela-miller`, `process-derrick-vance`, etc.) asynchronously and appends the agent's completed response email to the MongoDB thread.
+
+### 3. Hindsight Vector Memory & Context Window Ingestion
+- **Vector Bank Retention**: User email queries and preferences are retained in Hindsight banks using `hindsightService.retain(sender, content, context)`.
+- **Context Preference Recall**: Prior to model invocation, agents recall user preferences and inject them into their LLM prompt context window.
+
+### 4. Playwright Browser Sandbox (`UseBrowser`)
+- **Browser Automation Sandbox**: Agents invoke `useBrowser.graph.invoke({ session: state.session, query, maxSteps: 5, stepNumber: 0 })` to collect live web data or perform tasks on behalf of the user.
+- **Graceful Human Intervention**: State machines evaluate `humanInterventionCondition` and halt execution gracefully if human interaction (e.g. CAPTCHA) is required.
+
+---
+
+## 🔧 Environment Configuration
+
+Create a `.env` file in `backend/`:
+
+```env
+# Server Configuration
+PORT=5000
+FRONTEND_URL=http://localhost:3000
+
+# AI Models (Google Gemini)
+GEMINI_API_KEY=your_gemini_api_key
+
+# Databases & Queues
+MONGODB_URI=mongodb://localhost:27017/foundersharness
+REDIS_HOST=localhost
+REDIS_PORT=6379
+
+# Hindsight Memory Engine
+HINDSIGHT_URL=http://localhost:8080
+
+# Authentication (Better-Auth)
+BETTER_AUTH_SECRET=your_secret_key
 ```
 
-## Run tests
+---
+
+## 🚀 Installation & Running
 
 ```bash
-# unit tests
-$ npm run test
-
-# e2e tests
-$ npm run test:e2e
-
-# test coverage
-$ npm run test:cov
+cd backend
+npm install
+npm run start:dev
 ```
 
-## Deployment
+The API server will run on [http://localhost:5000/api](http://localhost:5000/api), with the WebSocket Relay running on `ws://localhost:5001`.
 
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
+---
 
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+## 📡 API Endpoint Reference
 
-```bash
-$ npm install -g @nestjs/mau
-$ mau deploy
-```
+### Agents Controller (`/api/agents`)
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+- `POST /api/agents/reply-email`
+  - **Body**: `{ "receiver": "pamela.miller@foundersharness.ai", "content": "Build a 7-day launch calendar", "threadId": "..." }`
+  - **Response**: `{ "reply": "I have initiated the process, will get back whenever it is completed" }`
+- `GET /api/agents/threads`
+  - **Response**: Array of MongoDB `EmailThread` documents.
 
-## Resources
+### Onboarding Controller (`/api/onboarding`)
 
-Check out a few resources that may come in handy when working with NestJS:
+- `POST /api/onboarding`
+  - **Body**: Array of onboarding answers `CreateOnboardingDto[]`.
+- `POST /api/onboarding/extract`
+  - **Body**: `LeanCanvasOutput` object.
 
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
+### User Controller (`/api/user`)
 
-## Support
-
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
-
-## Stay in touch
-
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
-
-## License
-
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+- `GET /api/user/status`
+  - Returns `{ "exists": boolean, "email": string }`.
+- `GET /api/user/memory`
+  - Returns knowledge graph node-edge data.

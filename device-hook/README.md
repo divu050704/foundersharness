@@ -1,130 +1,121 @@
-# foundersharness Dev Helper (`device-hook`)
+# foundersharness Dev Helper (`device-hook`) 🖥️
 
-A lightweight C# .NET 8 Windows Forms system tray utility designed to act as an execution bridge between your backend AI agent and a locally managed Playwright browser.
-
-## Features
-
-1. **System Tray Residency**: The application sits in your system tray under the name `foundersharness Dev Helper`. It renders a dynamic badge icon (`H`) in the tray, keeping your taskbar clean.
-2. **Double-Click Action**: Double-clicking the tray icon (or selecting **Show Logs / Control Panel** from the right-click menu) opens the Control Panel window.
-3. **Graceful Minimize-to-Tray**: Clicking the "X" close button doesn't quit the application; it hides the UI and keeps the browser and server running in the background. To quit, right-click the system tray icon and choose **Exit Application**.
-4. **Programmatic Playwright Installer**: Playwright requires browser engines (Chromium, Firefox, Webkit) to be downloaded. The app detects if they are missing and downloads them silently in a background thread when you click **Install Playwright**, logging the installation progress in real-time.
-5. **Built-in WebSocket Server**: Operates a native, lightweight WebSocket server on `ws://localhost:9000` to receive control requests from your NestJS backend or other agents.
-6. **Beautiful Dark-Theme Control Panel**: Features an Charcoal-Dark control panel showing live status indicators for the WebSocket server and browser connection, controls to manual toggle them, and a scrollable console displaying timestamped debug logs.
+A lightweight **C# .NET 8 (Avalonia UI)** Windows system tray utility designed to act as an execution bridge between your backend AI agents and locally managed Playwright browser sessions.
 
 ---
 
-## Getting Started
+## 🌟 Features
 
-### 1. How to Build and Run the App
+1. **System Tray Residency**: Sits cleanly in your Windows system tray under `foundersharness Dev Helper` with a dynamic vector icon (`H`).
+2. **Avalonia Control Panel**: Built-in dark theme control panel showing live status indicators for the WebSocket server (`ws://localhost:9000`) and active Playwright browser sessions.
+3. **Minimize-to-Tray**: Intercepts close (`X`) events to keep server and browser execution uninterrupted in the background. To quit, right-click the system tray icon and select **Exit Application**.
+4. **Automated `playwright-cli` Installer**: Detects missing browser CLI tooling and downloads required browser engines in background threads, logging installation progress in real-time.
+5. **Native Asynchronous WebSocket Server**: Hosts an `HttpListener` WebSocket gateway on `ws://localhost:9000` for real-time agent control.
+6. **Session-Aware Browser Execution**: Supports multi-session isolated browser profiles via `playwright-cli`.
 
-Open your terminal in the `device-hook` folder and run the standard .NET CLI commands:
+---
+
+## 🚀 Getting Started
+
+### 1. Build and Run
 
 ```bash
-# Navigate to the project folder
+# Navigate to device-hook directory
 cd device-hook
 
-# Build the project
+# Build project with .NET CLI
 dotnet build
 
-# Run the application
+# Run application
 dotnet run
 ```
 
-Once started, the application will initialize silently and sit in your Windows System Tray (typically in the bottom right overflow menu). Double-click the tray icon to open the Control Panel.
+Once launched, the app minimizes to your Windows system tray. Double-click the tray icon to open the Control Panel.
 
 ---
 
-## Connecting Your Backend Agent
+## 📡 Message Routing & Connection Architecture
 
-Your backend (e.g., NestJS application in `/backend`) can easily connect to this helper via WebSockets. Here is a TypeScript example of how to connect and send commands:
+The application hosts a WebSocket server on `ws://localhost:9000/`.
 
-```typescript
-import WebSocket from 'ws';
+In Founders Harness:
+- **Frontend WebApp** (`DeviceHookBridge`) connects directly to `device-hook` at `ws://localhost:9000/` and to the Backend WebSocket relay at `ws://localhost:5001`.
+- **Backend Services** (`DeviceHookService`) send browser commands to Frontend over `ws://localhost:5001`.
+- **Frontend** relays the commands over `ws://localhost:9000/` to `device-hook`, receives responses from `device-hook`, and relays them back to Backend.
 
-// Connect to the C# helper's WebSocket server
-const ws = new WebSocket('ws://localhost:9000/');
-
-ws.on('open', () => {
-  console.log('Connected to foundersharness C# Helper!');
-
-  // Send a navigation command to the browser
-  const command = {
-    id: 'cmd_1',
-    action: 'navigate',
-    url: 'https://news.ycombinator.com'
-  };
-  ws.send(JSON.stringify(command));
-});
-
-ws.on('message', (data) => {
-  const response = JSON.parse(data.toString());
-  console.log('Received response from C# helper:', response);
-  
-  if (response.status === 'success') {
-     // Execute next action, e.g., click an element or take a screenshot
-  }
-});
+```
++----------------+      ws://localhost:5001      +---------------+      ws://localhost:9000      +----------------------+
+| NestJS Backend | <---------------------------> | Next.js WebApp | <---------------------------> | device-hook (C# App) |
++----------------+                               +---------------+                               +----------------------+
 ```
 
 ---
 
-## JSON API Protocol Reference
-
-The C# helper processes incoming JSON text messages and returns JSON replies.
+## 📑 Protocol Specification
 
 ### General Message Format
 
-**Request:**
+**Request Payload:**
 ```json
 {
   "id": "unique_message_id",
   "action": "action_name",
-  "url": "optional_url",
-  "selector": "optional_css_selector",
-  "text": "optional_input_text",
-  "key": "optional_keyboard_key",
-  "script": "optional_js_script"
+  "sessionName": "optional_session_identifier",
+  "url": "https://example.com",
+  "ref": "element_ref_id",
+  "text": "input_text",
+  "key": "Enter",
+  "script": "JavaScript code"
 }
 ```
 
-**Response:**
+**Response Payload:**
 ```json
 {
-  "id": "same_message_id",
+  "id": "unique_message_id",
   "status": "success" | "error",
   "result": "action_dependent_result_payload",
   "message": "error_message_string_if_failed"
 }
 ```
 
+---
+
 ### Supported Actions
 
-| Action | Parameters | Description | Result Returned |
+| Action | Parameters | Description | Result Payload |
 | :--- | :--- | :--- | :--- |
-| `launch` | None | Launches the visible Chromium browser if not already open. | `"Browser launched successfully."` |
-| `close` | None | Closes the running browser instance. | `"Browser closed successfully."` |
-| `navigate` | `url` | Navigates the browser to the specified website. | `"Navigated to [URL]"` |
-| `click` | `selector` | Clicks the element matching the CSS selector. | `"Clicked selector [selector]"` |
-| `fill` | `selector`, `text` | Types text into an input field matching the CSS selector. | `"Filled [selector] with text"` |
-| `press` | `selector`, `key` | Presses a key (e.g., `"Enter"`) on the specified selector. | `"Pressed [key] on [selector]"` |
-| `screenshot`| None | Takes a screenshot of the active browser page. | Base64-encoded PNG string |
-| `content` | None | Retrieves the ARIA accessibility tree snapshot of the active page. | YAML-formatted ARIA snapshot string |
-| `get_text` | `selector` | Reads the text content of the specified selector. | String text content |
-| `get_value` | `selector` | Reads the input value of the specified selector. | String input value |
-| `new_page` | None | Opens a new browser tab/page. | `"Opened new tab"` |
-| `close_page`| None | Closes the current active tab and switches to the last one. | `"Closed tab"` |
-| `active_pages`| None | Lists all URLs currently open across your tabs. | Array of URL strings |
-| `evaluate` | `script` | Executes custom JavaScript inside the active page context. | Stringified JSON result |
+| `launch` | `sessionName` | Opens Playwright Chromium browser | `"Browser launched successfully."` |
+| `close` | `sessionName` | Closes active browser session | `"Browser closed successfully."` |
+| `navigate` | `url`, `sessionName` | Navigates browser to specified URL | `"Navigated to [URL]"` |
+| `snapshot` | `ref`, `depth` | Captures YAML accessibility tree snapshot | YAML string content |
+| `click_ref` | `ref` | Clicks target ref element | `"Clicked ref [ref]"` |
+| `dblclick_ref`| `ref` | Double-clicks target ref element | `"Double-clicked ref [ref]"` |
+| `fill_ref` | `ref`, `text`, `submit` | Types text into input field (optional enter key submit) | `"Filled ref [ref]"` |
+| `select_ref` | `ref`, `value` | Selects dropdown option by value | `"Selected [value] on ref [ref]"` |
+| `check_ref` | `ref` | Checks checkbox or radio button | `"check ref [ref]"` |
+| `uncheck_ref`| `ref` | Unchecks checkbox | `"uncheck ref [ref]"` |
+| `hover_ref` | `ref` | Hovers mouse over target ref | `"Hovered ref [ref]"` |
+| `press` | `key`, `ref` | Focuses element (optional) and presses keyboard key | `"Pressed [key]"` |
+| `type` | `text` | Types raw text into focused element | `"Typed text"` |
+| `screenshot` | `ref` (optional) | Captures screenshot of page or element | Base64-encoded PNG string |
+| `dialog_accept`| `promptText` | Accepts JS alert/prompt dialog | `"Dialog accepted"` |
+| `dialog_dismiss`| None | Dismisses JS alert dialog | `"Dialog dismissed"` |
+| `evaluate` | `script`, `ref` | Executes custom JS inside page or element context | Stringified execution output |
+| `get_text` | `ref` | Extracts `textContent` of ref element | Text string |
+| `get_value` | `ref` | Extracts `value` property of ref element | Value string |
+| `new_page` | `url` | Opens a new browser tab | `"Opened new tab"` |
+| `close_page`| `index` | Closes tab by index or active tab | `"Closed tab"` |
+| `active_pages`| None | Lists open tabs in session | Tab list payload |
+| `go_back` | None | Navigates back in history | `"go-back"` |
+| `go_forward`| None | Navigates forward in history | `"go-forward"` |
+| `reload` | None | Reloads active page | `"reload"` |
 
 ---
 
-## Code Architecture (How We Did It)
+## 🏛️ Code Architecture
 
-Here is a quick overview of the code written in [Form1.cs](file:///D:/Divyanshu/Work/foundersharness/device-hook/Form1.cs):
-
-1. **`SetupCustomUI()`**: Instantiates UI panels, labels, textbox logs, and styled flat buttons programmatically. This ensures the app is styled beautifully (Charcoal Dark UI theme) without relying on Visual Studio's drag-and-drop designer.
-2. **`SetupSystemTray()`**: Creates a `NotifyIcon` and associates it with a `ContextMenuStrip` featuring common controls (Show, Launch Browser, Exit). It calls `CreateDynamicIcon()` which uses C# `Graphics` to draw a vector circular gradient icon at runtime.
-3. **`SetVisibleCore(bool)`**: We override this WinForms method to intercept the form's visibility on startup. It forces the form to remain hidden during launch, allowing the application to boot cleanly straight to the system tray.
-4. **`StartWebSocketServerAsync()`**: Boots an asynchronous `HttpListener` on port `9000`. It filters incoming requests to accept WebSocket handshakes using `context.AcceptWebSocketAsync()` and processes incoming client command strings.
-5. **`CheckAndInstallPlaywrightAsync(bool)`**: Resolves browser dependencies. Since automated processes cannot interact with user UAC dialogs, this checks the local AppData folder for browser engines. If missing, it starts a silent background `PowerShell.exe` process that executes `playwright.ps1 install` in your project build directory, redirecting standard output directly into our UI console logs.
-6. **`ProcessPlaywrightCommandAsync(string)`**: Standard router that parses incoming JSON agent commands and maps them to async calls on the `Microsoft.Playwright` API (such as `_activePage.GotoAsync()`, `_activePage.ClickAsync()`, etc.).
+- **`MainWindow.axaml / cs`**: Main Avalonia Window managing UI logs, system tray creation (`SetupSystemTray`), and auto-setup checks.
+- **`StartWebSocketServerAsync()`**: Asynchronous `HttpListener` managing client connections on `ws://localhost:9000/`.
+- **`ProcessCliCommandAsync()`**: Routes agent WebSocket requests to underlying `playwright-cli` processes.
+- **`RunCliAsync()`**: Asynchronous process runner executing `playwright-cli` CLI subcommands safely in the background.

@@ -20,6 +20,11 @@ export class HindsightService {
       },
     );
   }
+
+  async retain(email: string, content: string, context = 'User query & Preference') {
+    const bankId = `user:${email}`;
+    return this.client.retain(bankId, content, { context });
+  }
   async getEntityGraph(email: string) {
     const bankId = `user:${email}`;
     const res = await fetch(

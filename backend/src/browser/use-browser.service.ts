@@ -1,17 +1,16 @@
 import { ConditionalEdgeRouter, GraphNode, StateGraph, StateSchema, START, END } from "@langchain/langgraph";
 import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
 import z from "zod";
+import { Injectable, Logger } from "@nestjs/common";
 import { DeviceHookService } from "./device-hook.service";
-import { Injectable } from "@nestjs/common";
-
 
 @Injectable()
 export class UseBrowser {
+    
+    constructor(private readonly hookService: DeviceHookService, private readonly logger: Logger) {}
+
     private sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-
-    private hookService = new DeviceHookService()
-    // hookService.onModuleInit();
     private model = new ChatGoogleGenerativeAI({
         model: "gemini-3.5-flash-lite"
     })
@@ -119,15 +118,33 @@ export class UseBrowser {
         let accessibilityTree = "";
 
         while (true) {
-            const raw = await this.hookService.sendCommand("snapshot", { sessionName: state.session });
-            await this.sleep(500);
-            const payload = typeof raw === "string" ? raw : raw?.result;
+            let payload = "";
+            let retries = 0;
 
-            if (!payload) {
-                throw new Error(`snapshot command returned no usable payload. Got: ${JSON.stringify(raw)}`);
+            while (retries < 5) {
+                try {
+                    const raw = await this.hookService.sendCommand("snapshot", { sessionName: state.session });
+                    await this.sleep(1000);
+                    const extracted = typeof raw === "string" ? raw : raw?.result || raw?.message;
+                    if (extracted && typeof extracted === "string" && extracted.trim().length > 0) {
+                        payload = extracted;
+                        break;
+                    }
+                } catch (err: any) {
+                    this.logger.warn(`Snapshot command failed on attempt ${retries + 1}/5: ${err.message}`);
+                }
+                retries++;
+                this.logger.warn(`Snapshot returned empty payload on attempt ${retries}/5. Retrying after 1.5s...`);
+                await this.sleep(1500);
             }
 
-            accessibilityTree = payload;
+            if (!payload || payload.trim().length === 0) {
+                this.logger.warn(`Snapshot command returned no usable payload after 5 attempts. Defaulting to empty fallback tree.`);
+                accessibilityTree = "Page accessibility tree is loading or empty.";
+            } else {
+                accessibilityTree = payload;
+            }
+
             console.log(`-> Tree Extracted`);
 
             const prompt = `

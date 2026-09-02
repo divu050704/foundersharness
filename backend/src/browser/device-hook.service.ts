@@ -4,22 +4,16 @@ import {
   OnModuleInit,
   OnModuleDestroy,
 } from '@nestjs/common';
-import WebSocket from 'ws';
+import WebSocket, { WebSocketServer } from 'ws';
 
 @Injectable()
 export class DeviceHookService implements OnModuleInit, OnModuleDestroy {
-  onModuleInit() {
-    throw new Error('Method not implemented.');
-  }
-  onModuleDestroy() {
-    throw new Error('Method not implemented.');
-  }
+  private readonly logger = new Logger(DeviceHookService.name);
+  private wss: WebSocketServer | null = null;
+  private frontendSockets = new Set<WebSocket>();
+  private readonly relayPort = parseInt(process.env.RELAY_WS_PORT || '5001', 10);
 
-
-  // private readonly logger = new Logger(DeviceHookService.name);
-  private ws: WebSocket | null = null;
-
-  private readonly wsUrl = "ws://localhost:9000/";
+  private isDeviceHookConnectedToFrontend = false;
 
   private pendingRequests = new Map<
     string,
@@ -30,129 +24,117 @@ export class DeviceHookService implements OnModuleInit, OnModuleDestroy {
   >();
 
   private messageIdCounter = 0;
+  private activeSessionName = 'default';
 
-  private reconnectTimeout: NodeJS.Timeout | null = null;
+  onModuleInit() {
+    this.startRelayServer();
+  }
 
-  private isConnected = false;
+  onModuleDestroy() {
+    this.stopRelayServer();
+  }
 
-  private activeSessionName = "default";
+  private startRelayServer() {
+    try {
+      this.wss = new WebSocketServer({ port: this.relayPort });
+      this.logger.log(`Backend WebSocket relay server listening on ws://localhost:${this.relayPort}`);
+
+      this.wss.on('connection', (ws: WebSocket) => {
+        this.logger.log('Frontend relay client connected to backend WebSocket server.');
+        this.frontendSockets.add(ws);
+
+        ws.on('message', (data: WebSocket.Data) => {
+          this.handleFrontendMessage(data);
+        });
+
+        ws.on('close', () => {
+          this.logger.warn('Frontend relay client disconnected from backend WebSocket server.');
+          this.frontendSockets.delete(ws);
+          if (this.frontendSockets.size === 0) {
+            this.isDeviceHookConnectedToFrontend = false;
+          }
+        });
+
+        ws.on('error', (err) => {
+          this.logger.error(`Frontend relay WebSocket error: ${err.message}`);
+        });
+      });
+    } catch (err: any) {
+      this.logger.error(`Failed to start relay server on port ${this.relayPort}: ${err.message}`);
+    }
+  }
+
+  private stopRelayServer() {
+    for (const ws of this.frontendSockets) {
+      try {
+        ws.close();
+      } catch {}
+    }
+    this.frontendSockets.clear();
+
+    if (this.wss) {
+      this.wss.close();
+      this.wss = null;
+    }
+  }
+
+  private handleFrontendMessage(data: WebSocket.Data) {
+    try {
+      const message = JSON.parse(data.toString());
+
+      if (message?.type === 'device-hook-status') {
+        this.isDeviceHookConnectedToFrontend = !!message.connected;
+        this.logger.log(`Frontend reported device-hook status: connected=${this.isDeviceHookConnectedToFrontend}`);
+        return;
+      }
+
+      if (message?.id) {
+        const pending = this.pendingRequests.get(message.id);
+        if (pending) {
+          this.pendingRequests.delete(message.id);
+          if (message.status === 'error') {
+            pending.reject(new Error(message.message || 'Device hook error'));
+          } else {
+            pending.resolve(message.result);
+          }
+        }
+      }
+    } catch (err: any) {
+      this.logger.error(`Failed to parse WebSocket message from frontend relay: ${err.message}`);
+    }
+  }
 
   async connect(): Promise<void> {
     if (this.isHookConnected()) {
       return;
     }
-
     return new Promise((resolve, reject) => {
-      console.log(
-        `Connecting to device-hook WebSocket at ${this.wsUrl}...`,
-      );
-
-      const socket = new WebSocket(this.wsUrl);
-
-      this.ws = socket;
-
-      socket.on("open", () => {
-        this.isConnected = true;
-
-        console.log(
-          "Successfully connected to device-hook C# helper.",
-        );
-
+      if (this.isHookConnected()) {
         resolve();
-      });
-
-      socket.on("message", (data: WebSocket.Data) => {
-        try {
-          const response = JSON.parse(data.toString());
-
-          if (response?.id) {
-            const pending = this.pendingRequests.get(response.id);
-
-            if (pending) {
-              this.pendingRequests.delete(response.id);
-
-              if (response.status === "error") {
-                pending.reject(
-                  new Error(
-                    response.message || "Device hook error",
-                  ),
-                );
-              } else {
-                pending.resolve(response.result);
-              }
-            }
-          }
-        } catch (err) {
-          console.error(
-            "Failed to parse WebSocket message:",
-            err,
-          );
+        return;
+      }
+      let elapsed = 0;
+      const interval = setInterval(() => {
+        elapsed += 500;
+        if (this.isHookConnected()) {
+          clearInterval(interval);
+          resolve();
+        } else if (elapsed >= 5000) {
+          clearInterval(interval);
+          reject(new Error('Frontend relay client is not connected to backend WebSocket server.'));
         }
-      });
-
-      socket.on("close", () => {
-        this.isConnected = false;
-
-        console.warn(
-          "Connection to device-hook closed.",
-        );
-
-        this.scheduleReconnect();
-      });
-
-      socket.on("error", (err) => {
-        this.isConnected = false;
-
-        console.error(
-          "device-hook WebSocket error:",
-          err.message,
-        );
-
-        reject(err);
-      });
+      }, 500);
     });
   }
 
-  private scheduleReconnect() {
-    if (this.reconnectTimeout) {
-      return;
-    }
-
-    this.reconnectTimeout = setTimeout(() => {
-      this.reconnectTimeout = null;
-
-      this.connect().catch(() => {});
-    }, 5000);
-  }
-
   disconnect() {
-    if (this.reconnectTimeout) {
-      clearTimeout(this.reconnectTimeout);
-      this.reconnectTimeout = null;
-    }
-
-    if (this.ws) {
-      this.ws.removeAllListeners();
-
-      if (
-        this.ws.readyState === WebSocket.OPEN ||
-        this.ws.readyState === WebSocket.CONNECTING
-      ) {
-        this.ws.close();
-      }
-
-      this.ws = null;
-    }
-
-    this.isConnected = false;
+    this.stopRelayServer();
+    this.startRelayServer();
   }
 
   setActiveSessionName(name: string) {
-    this.activeSessionName = name || "default";
-
-    console.log(
-      `Active browser session set to: ${this.activeSessionName}`,
-    );
+    this.activeSessionName = name || 'default';
+    this.logger.log(`Active browser session set to: ${this.activeSessionName}`);
   }
 
   getActiveSessionName(): string {
@@ -160,10 +142,19 @@ export class DeviceHookService implements OnModuleInit, OnModuleDestroy {
   }
 
   isHookConnected(): boolean {
-    return (
-      this.isConnected &&
-      this.ws?.readyState === WebSocket.OPEN
+    const hasActiveSocket = Array.from(this.frontendSockets).some(
+      (ws) => ws.readyState === WebSocket.OPEN,
     );
+    return hasActiveSocket && this.isDeviceHookConnectedToFrontend;
+  }
+
+  private getActiveFrontendSocket(): WebSocket | null {
+    for (const ws of this.frontendSockets) {
+      if (ws.readyState === WebSocket.OPEN) {
+        return ws;
+      }
+    }
+    return null;
   }
 
   async sendCommand(
@@ -171,25 +162,24 @@ export class DeviceHookService implements OnModuleInit, OnModuleDestroy {
     params: Record<string, any> = {},
     timeoutMs = 40000,
   ): Promise<any> {
-
-    if (!this.isHookConnected()) {
-      await this.connect();
+    let ws = this.getActiveFrontendSocket();
+    if (!ws) {
+      try {
+        await this.connect();
+        ws = this.getActiveFrontendSocket();
+      } catch (e) {}
     }
 
-    if (!this.isHookConnected()) {
-      throw new Error(
-        "device-hook helper is not running or connected.",
-      );
+    if (!ws) {
+      throw new Error('No frontend relay client is currently connected to backend.');
     }
 
-    const id =
-      `backend_${Date.now()}_${this.messageIdCounter++}`;
+    const id = `backend_${Date.now()}_${this.messageIdCounter++}`;
 
     const payload = {
       id,
       action,
-      sessionName:
-        params.sessionName || this.activeSessionName,
+      sessionName: params.sessionName || this.activeSessionName,
       ...params,
     };
 
@@ -197,12 +187,9 @@ export class DeviceHookService implements OnModuleInit, OnModuleDestroy {
       const timeout = setTimeout(() => {
         if (this.pendingRequests.has(id)) {
           this.pendingRequests.delete(id);
-
           reject(
             new Error(
-              `Command '${action}' timed out after ${
-                timeoutMs / 1000
-              } seconds.`,
+              `Command '${action}' timed out after ${timeoutMs / 1000} seconds.`,
             ),
           );
         }
@@ -213,7 +200,6 @@ export class DeviceHookService implements OnModuleInit, OnModuleDestroy {
           clearTimeout(timeout);
           resolve(result);
         },
-
         reject: (error) => {
           clearTimeout(timeout);
           reject(error);
@@ -221,7 +207,7 @@ export class DeviceHookService implements OnModuleInit, OnModuleDestroy {
       });
 
       try {
-        this.ws!.send(JSON.stringify(payload));
+        ws.send(JSON.stringify(payload));
       } catch (err) {
         clearTimeout(timeout);
         this.pendingRequests.delete(id);

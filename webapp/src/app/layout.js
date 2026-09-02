@@ -3,6 +3,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import QueryProvider from "@/providers/QueryProvider";
 import ThemeProvider from "@/providers/ThemeProvider";
+import DeviceHookBridge from "@/components/DeviceHookBridge";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -31,6 +32,7 @@ export default function RootLayout({ children }) {
         <QueryProvider>
           <ThemeProvider>
             <TooltipProvider>
+              <DeviceHookBridge />
               {children}
               <Toaster />
             </TooltipProvider>

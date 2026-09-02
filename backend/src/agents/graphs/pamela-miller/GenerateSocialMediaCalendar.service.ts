@@ -7,9 +7,9 @@ import { UseBrowser } from "../../../browser/use-browser.service";
 
 @Injectable()
 export class GenerateSocialMediaCalendar {
-    constructor(private readonly useBrowser: UseBrowser,
-        private readonly logger: Logger
-    ) { }
+    private readonly logger = new Logger(GenerateSocialMediaCalendar.name);
+
+    constructor(private readonly useBrowser: UseBrowser) { }
 
     private model = new ChatGoogleGenerativeAI({
         model: "gemini-3.5-flash-lite"

@@ -32,7 +32,6 @@ export class MemoryService {
     const strippedUserID = stripUserName(userId)
 
     const results = await this.store.search([strippedUserID, 'memory'], { query, limit });
-    console.log(results)
     return type ? results.filter((r) => r.value.type === type) : results;
   }
 

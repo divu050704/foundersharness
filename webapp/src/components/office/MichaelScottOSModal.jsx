@@ -4,6 +4,7 @@ import { CheckSquare, FileText, Mail, Minus, Send, Square, Paperclip } from "luc
 import { useState, useEffect } from "react";
 import { playRetroSound } from "@/lib/retroAudio";
 import { api } from "@/lib/api";
+import { authClient } from "@/lib/auth-client";
 import PixelHumanFigure from "./PixelHumanFigure";
 
 export function formatEmailDate(dateInput) {
@@ -41,6 +42,32 @@ export default function MichaelScottOSModal({
   onDispatchTask,
   onUpdateAgent,
 }) {
+  const { data: sessionData } = authClient.useSession();
+  const [currentUser, setCurrentUser] = useState({
+    name: "Founder",
+    email: "founder@harness.io",
+  });
+
+  useEffect(() => {
+    if (sessionData?.user) {
+      setCurrentUser({
+        name: sessionData.user.name || "Founder",
+        email: sessionData.user.email || "founder@harness.io",
+      });
+    } else {
+      const stored = localStorage.getItem("founder_user");
+      if (stored) {
+        try {
+          const parsed = JSON.parse(stored);
+          setCurrentUser({
+            name: parsed.name || "Founder",
+            email: parsed.email || "founder@harness.io",
+          });
+        } catch (_e) {}
+      }
+    }
+  }, [sessionData]);
+
   const [activeApp, setActiveApp] = useState("email"); // "email" | "tasks" | "notes" | "mempalace"
   const [selectedEmailId, setSelectedEmailId] = useState("demo-1");
   const [recipientEmail, setRecipientEmail] = useState("");
@@ -53,7 +80,16 @@ export default function MichaelScottOSModal({
   const [showForm, setShowForm] = useState(false);
   const [emails, setEmails] = useState([]);
 
-  // Fetch threads from backend DB on mount
+  // Helper to send email to backend API
+  const sendEmailToAgent = async (payload) => {
+    try {
+      return await api.post("/api/agents/reply-email", payload);
+    } catch (err) {
+      console.error("Failed to send email to agent:", err);
+    }
+  };
+
+  // Fetch threads from backend DB on mount and poll periodically for background agent completions
   useEffect(() => {
     async function loadThreads() {
       try {
@@ -62,18 +98,29 @@ export default function MichaelScottOSModal({
           const formatted = res.flatMap((thread) => {
             const subject = thread.subject || "No Subject";
             return (thread.emails || []).map((email, idx) => {
-              const matchingAgent = agents.find(
-                (a) => a.email === email.receiver || a.email === email.sender
+              const matchingAgentSender = agents.find(
+                (a) => a.email === email.sender
               );
+              const matchingAgentReceiver = agents.find(
+                (a) => a.email === email.receiver
+              );
+              const isSenderAgent =
+                matchingAgentSender !== undefined ||
+                (email.sender &&
+                  (email.sender.includes('@foundersharness.ai') ||
+                    email.sender.includes('@dundermifflin.com')));
+              const agentObj = matchingAgentSender || matchingAgentReceiver;
               const createdAt = email.createdAt ? new Date(email.createdAt) : new Date();
+
               return {
                 id: thread._id ? `${thread._id}-${idx}` : `thread-${Date.now()}-${idx}`,
                 threadId: thread._id,
-                agentId: matchingAgent?.id || "agent",
-                sender: email.sender || "Founder / Marcus Scott",
-                senderEmail: email.sender || "marcus.scott@foundersharness.ai",
-                receiver: email.receiver || matchingAgent?.email || "",
-                role: matchingAgent?.officeRole || "Agent",
+                agentId: agentObj?.id || "agent",
+                sender: isSenderAgent ? (matchingAgentSender?.name || email.sender) : (currentUser.name || "Founder"),
+                senderEmail: isSenderAgent ? email.sender : (currentUser.email || "founder@harness.io"),
+                receiver: email.receiver || matchingAgentReceiver?.email || "",
+                role: isSenderAgent ? (matchingAgentSender?.officeRole || "Agent") : "Founder",
+                isSenderAgent: isSenderAgent,
                 subject: subject,
                 createdAt: createdAt,
                 time: createdAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
@@ -85,7 +132,6 @@ export default function MichaelScottOSModal({
           });
           if (formatted.length > 0) {
             setEmails(formatted);
-            setSelectedEmailId(formatted[0].id);
           }
         }
       } catch (err) {
@@ -93,7 +139,9 @@ export default function MichaelScottOSModal({
       }
     }
     loadThreads();
-  }, [agents]);
+    const interval = setInterval(loadThreads, 5000);
+    return () => clearInterval(interval);
+  }, [agents, currentUser]);
 
   const selectedEmail =
     emails.find((e) => e.id === selectedEmailId) || emails[0] || null;
@@ -158,10 +206,11 @@ export default function MichaelScottOSModal({
         id: `email-${now.getTime()}-me`,
         threadId: selectedEmail.threadId,
         agentId: selectedEmail.agentId,
-        sender: "Founder / Marcus Scott",
-        senderEmail: "marcus.scott@foundersharness.ai",
+        sender: currentUser.name || "Founder",
+        senderEmail: currentUser.email || "founder@harness.io",
         receiver: recipientEmail.trim(),
         role: "Founder",
+        isSenderAgent: false,
         subject: emailSubject || "No Subject",
         createdAt: now,
         time: now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
@@ -169,27 +218,11 @@ export default function MichaelScottOSModal({
         body: emailBody,
         attachments: attachmentList,
       };
-      
-      const agentReplyObj = {
-        id: `email-${now.getTime()}-agent`,
-        threadId: selectedEmail.threadId,
-        agentId: selectedEmail.agentId,
-        sender: selectedEmail.sender,
-        senderEmail: selectedEmail.senderEmail,
-        receiver: "marcus.scott@foundersharness.ai",
-        role: selectedEmail.role,
-        subject: `Re: ${emailSubject || "No Subject"}`,
-        createdAt: new Date(now.getTime() + 1000), // 1 second later
-        time: new Date(now.getTime() + 1000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-        unread: false,
-        body: response?.reply || "",
-        attachments: [],
-      };
 
-      setEmails((prev) => [agentReplyObj, myReply, ...prev]);
+      setEmails((prev) => [myReply, ...prev]);
       
-      setSentNotification("Reply sent successfully!");
-      setTimeout(() => setSentNotification(""), 4000);
+      setSentNotification(response?.reply || "Reply sent! Task running in background queue.");
+      setTimeout(() => setSentNotification(""), 6000);
       setRecipientEmail("");
       setEmailSubject("");
       setEmailBody("");
@@ -234,8 +267,8 @@ const handleSendEmail = async (e) => {
       newThreads.push({
         id: `thread-${now.getTime()}-${agent.id}`,
         agentId: agent.id,
-        sender: "Founder / Marcus Scott",
-        senderEmail: "marcus.scott@foundersharness.ai",
+        sender: currentUser.name || "Founder",
+        senderEmail: currentUser.email || "founder@harness.io",
         receiver: receiverEmail,
         role: agent.officeRole,
         subject: `[Broadcast] ${subjectText}`,
@@ -271,8 +304,8 @@ const handleSendEmail = async (e) => {
     const newThread = {
       id: `thread-${now.getTime()}-${Math.random().toString(36).substr(2, 5)}`,
       agentId: targetAgentObj?.id || "agent",
-      sender: "Founder / Marcus Scott",
-      senderEmail: "marcus.scott@foundersharness.ai",
+      sender: currentUser.name || "Founder",
+      senderEmail: currentUser.email || "founder@harness.io",
       receiver: targetEmail,
       role: targetAgentObj?.officeRole || "Agent",
       subject: subjectText,
@@ -321,6 +354,25 @@ for (const email of sortedEmails) {
     uniqueThreads.push(email);
   }
 }
+
+// Get the displaying contact name for a thread in the inbox list
+const getThreadAgentName = (item) => {
+  const threadMsgs = emails.filter((e) => e.threadId && e.threadId === item.threadId);
+  const agentInThread =
+    agents.find((a) =>
+      threadMsgs.some((m) => m.senderEmail === a.email || m.receiver === a.email)
+    ) || agents.find((a) => a.email === item.receiver || a.id === item.agentId);
+
+  const isLastEmailFromUser =
+    item.senderEmail === currentUser.email ||
+    item.sender === currentUser.name ||
+    item.role === "Founder";
+
+  if (isLastEmailFromUser && agentInThread) {
+    return agentInThread.name;
+  }
+  return item.sender;
+};
 
 return (
   <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 backdrop-blur-md p-4 font-mono select-none">
@@ -461,7 +513,7 @@ return (
                 )}
                 <span className="font-bold uppercase">
                   {activeApp === "email" &&
-                    "FounderMail XP v4.2 — Michael Scott Executive Inbox"}
+                    `FounderMail XP v4.2 — ${currentUser.name} Executive Inbox`}
                   {activeApp === "tasks" &&
                     "Executive Agent Fleet Task Manager"}
                   {activeApp === "notes" &&
@@ -533,7 +585,7 @@ return (
                                 }`}
                             >
                               <div className="flex items-center justify-between text-[10px] font-bold gap-1">
-                                <span className="truncate">{item.sender}</span>
+                                <span className="truncate">{getThreadAgentName(item)}</span>
                                 <span
                                   className={`shrink-0 text-[9px] ${isSelected
                                       ? "text-amber-200"
@@ -544,7 +596,7 @@ return (
                                 </span>
                               </div>
                               <div
-                                className={`text-[10px] truncate mt-0.5 ${isSelected ? "text-slate-100 font-bold" : "text-slate-700"
+                                className={`text-[10px] truncate mt-0.5 ${isSelected ? "text-slate-100 font-bold" : "text-[#555]"
                                   }`}
                               >
                                 {item.subject}
@@ -600,7 +652,7 @@ return (
                             .filter(e => e.threadId === selectedEmail.threadId)
                             .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt))
                             .map((msg, index) => {
-                              const isMe = msg.senderEmail === "marcus.scott@foundersharness.ai" || msg.sender === "Founder / Marcus Scott";
+                              const isMe = !msg.isSenderAgent;
                               
                               return (
                                 <div key={msg.id} className={`p-3 rounded border ${isMe ? 'bg-[#f0f4f9] border-[#0055ea]/30 ml-8' : 'bg-white border-slate-200 mr-8'}`}>
