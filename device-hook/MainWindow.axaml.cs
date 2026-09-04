@@ -526,8 +526,17 @@ namespace foundersharness
         /// Builds and runs `playwright-cli [-s=session] {command}` in one place so every
         /// call site gets consistent session scoping.
         /// </summary>
-        private Task<CliResult> RunCliCommandAsync(string sessionName, string command, int timeoutMs = 30000) =>
+        private Task<CliResult> RunCliCommandAsync(string sessionName, string command, int timeoutMs = 40000) =>
             RunCliAsync($"{SessionPrefix(sessionName)}{command}", timeoutMs);
+
+        private static string GetCliErrorMessage(CliResult result)
+        {
+            string stdErr = result.StdErr?.Trim() ?? "";
+            string stdOut = result.StdOut?.Trim() ?? "";
+            if (!string.IsNullOrEmpty(stdErr)) return stdErr;
+            if (!string.IsNullOrEmpty(stdOut)) return stdOut;
+            return $"Process exited with code {result.ExitCode}";
+        }
 
         /// <summary>
         /// Per-session output directory for snapshot/screenshot files, so concurrent sessions
@@ -662,6 +671,20 @@ namespace foundersharness
                     if (!string.IsNullOrEmpty(sn)) sessionName = sn;
                 }
 
+                int defaultTimeoutMs = action.ToLower() switch
+                {
+                    "navigate" => 90000,
+                    "launch" => 90000,
+                    "open" => 90000,
+                    _ => 40000
+                };
+
+                int cmdTimeoutMs = defaultTimeoutMs;
+                if (root.TryGetProperty("timeoutMs", out var timeoutProp) && timeoutProp.TryGetInt32(out int parsedTimeout) && parsedTimeout > 0)
+                {
+                    cmdTimeoutMs = parsedTimeout;
+                }
+
                 if (action == "launch")
                 {
                     bool ok = await EnsureBrowserOpenAsync(sessionName);
@@ -701,9 +724,9 @@ namespace foundersharness
                         if (root.TryGetProperty("ref", out var snapRefProp))
                             cmd += $" {snapRefProp.GetString()}";
 
-                        var result = await RunCliCommandAsync(sessionName, cmd);
+                        var result = await RunCliCommandAsync(sessionName, cmd, timeoutMs: cmdTimeoutMs);
                         if (!result.Success)
-                            return CreateResponseJson(id, "error", null, $"snapshot failed: {result.StdErr}");
+                            return CreateResponseJson(id, "error", null, $"snapshot failed: {GetCliErrorMessage(result)}");
 
                         try
                         {
@@ -721,10 +744,10 @@ namespace foundersharness
                         if (!root.TryGetProperty("ref", out var refProp))
                             return CreateResponseJson(id, "error", null, "Missing 'ref' parameter for click_ref action.");
                         string refId = refProp.GetString() ?? "";
-                        var result = await RunCliCommandAsync(sessionName, $"click {refId}");
+                        var result = await RunCliCommandAsync(sessionName, $"click {refId}", timeoutMs: cmdTimeoutMs);
                         return result.Success
                             ? CreateResponseJson(id, "success", $"Clicked ref {refId}")
-                            : CreateResponseJson(id, "error", null, $"click_ref failed: {result.StdErr}");
+                            : CreateResponseJson(id, "error", null, $"click_ref failed: {GetCliErrorMessage(result)}");
                     }
 
                     case "dblclick_ref":
@@ -732,10 +755,10 @@ namespace foundersharness
                         if (!root.TryGetProperty("ref", out var refProp))
                             return CreateResponseJson(id, "error", null, "Missing 'ref' parameter for dblclick_ref action.");
                         string refId = refProp.GetString() ?? "";
-                        var result = await RunCliCommandAsync(sessionName, $"dblclick {refId}");
+                        var result = await RunCliCommandAsync(sessionName, $"dblclick {refId}", timeoutMs: cmdTimeoutMs);
                         return result.Success
                             ? CreateResponseJson(id, "success", $"Double-clicked ref {refId}")
-                            : CreateResponseJson(id, "error", null, $"dblclick_ref failed: {result.StdErr}");
+                            : CreateResponseJson(id, "error", null, $"dblclick_ref failed: {GetCliErrorMessage(result)}");
                     }
 
                     case "fill_ref":
@@ -750,10 +773,10 @@ namespace foundersharness
                         bool submit = root.TryGetProperty("submit", out var submitProp) && submitProp.GetBoolean();
                         string cmd = $"fill {fillRef} \"{escapedText}\"" + (submit ? " --submit" : "");
 
-                        var result = await RunCliCommandAsync(sessionName, cmd);
+                        var result = await RunCliCommandAsync(sessionName, cmd, timeoutMs: cmdTimeoutMs);
                         return result.Success
                             ? CreateResponseJson(id, "success", $"Filled ref {fillRef}")
-                            : CreateResponseJson(id, "error", null, $"fill_ref failed: {result.StdErr}");
+                            : CreateResponseJson(id, "error", null, $"fill_ref failed: {GetCliErrorMessage(result)}");
                     }
 
                     case "select_ref":
@@ -762,10 +785,10 @@ namespace foundersharness
                             return CreateResponseJson(id, "error", null, "Missing 'ref' or 'value' parameter for select_ref action.");
                         string selRef = selRefProp.GetString() ?? "";
                         string selVal = (selValProp.GetString() ?? "").Replace("\"", "\\\"");
-                        var result = await RunCliCommandAsync(sessionName, $"select {selRef} \"{selVal}\"");
+                        var result = await RunCliCommandAsync(sessionName, $"select {selRef} \"{selVal}\"", timeoutMs: cmdTimeoutMs);
                         return result.Success
                             ? CreateResponseJson(id, "success", $"Selected '{selVal}' on ref {selRef}")
-                            : CreateResponseJson(id, "error", null, $"select_ref failed: {result.StdErr}");
+                            : CreateResponseJson(id, "error", null, $"select_ref failed: {GetCliErrorMessage(result)}");
                     }
 
                     case "check_ref":
@@ -775,10 +798,10 @@ namespace foundersharness
                             return CreateResponseJson(id, "error", null, $"Missing 'ref' parameter for {action} action.");
                         string checkRef = checkRefProp.GetString() ?? "";
                         string cliCmd = action.ToLower() == "check_ref" ? "check" : "uncheck";
-                        var result = await RunCliCommandAsync(sessionName, $"{cliCmd} {checkRef}");
+                        var result = await RunCliCommandAsync(sessionName, $"{cliCmd} {checkRef}", timeoutMs: cmdTimeoutMs);
                         return result.Success
                             ? CreateResponseJson(id, "success", $"{cliCmd} ref {checkRef}")
-                            : CreateResponseJson(id, "error", null, $"{action} failed: {result.StdErr}");
+                            : CreateResponseJson(id, "error", null, $"{action} failed: {GetCliErrorMessage(result)}");
                     }
 
                     case "hover_ref":
@@ -786,10 +809,10 @@ namespace foundersharness
                         if (!root.TryGetProperty("ref", out var hoverRefProp))
                             return CreateResponseJson(id, "error", null, "Missing 'ref' parameter for hover_ref action.");
                         string hoverRef = hoverRefProp.GetString() ?? "";
-                        var result = await RunCliCommandAsync(sessionName, $"hover {hoverRef}");
+                        var result = await RunCliCommandAsync(sessionName, $"hover {hoverRef}", timeoutMs: cmdTimeoutMs);
                         return result.Success
                             ? CreateResponseJson(id, "success", $"Hovered ref {hoverRef}")
-                            : CreateResponseJson(id, "error", null, $"hover_ref failed: {result.StdErr}");
+                            : CreateResponseJson(id, "error", null, $"hover_ref failed: {GetCliErrorMessage(result)}");
                     }
 
                     case "navigate":
@@ -797,10 +820,10 @@ namespace foundersharness
                         if (!root.TryGetProperty("url", out var urlProp))
                             return CreateResponseJson(id, "error", null, "Missing 'url' parameter for navigate action.");
                         string url = urlProp.GetString() ?? "";
-                        var result = await RunCliCommandAsync(sessionName, $"goto \"{url}\"");
+                        var result = await RunCliCommandAsync(sessionName, $"goto \"{url}\"", timeoutMs: cmdTimeoutMs);
                         return result.Success
                             ? CreateResponseJson(id, "success", $"Navigated to {url}")
-                            : CreateResponseJson(id, "error", null, $"navigate failed: {result.StdErr}");
+                            : CreateResponseJson(id, "error", null, $"navigate failed: {GetCliErrorMessage(result)}");
                     }
 
                     case "go_back":
@@ -813,10 +836,10 @@ namespace foundersharness
                             "go_forward" => "go-forward",
                             _ => "reload"
                         };
-                        var result = await RunCliCommandAsync(sessionName, navCmd);
+                        var result = await RunCliCommandAsync(sessionName, navCmd, timeoutMs: cmdTimeoutMs);
                         return result.Success
                             ? CreateResponseJson(id, "success", navCmd)
-                            : CreateResponseJson(id, "error", null, $"{navCmd} failed: {result.StdErr}");
+                            : CreateResponseJson(id, "error", null, $"{navCmd} failed: {GetCliErrorMessage(result)}");
                     }
 
                     case "press":
@@ -831,15 +854,15 @@ namespace foundersharness
                         if (root.TryGetProperty("ref", out var pressRefProp))
                         {
                             string pressRef = pressRefProp.GetString() ?? "";
-                            var clickResult = await RunCliCommandAsync(sessionName, $"click {pressRef}");
+                            var clickResult = await RunCliCommandAsync(sessionName, $"click {pressRef}", timeoutMs: cmdTimeoutMs);
                             if (!clickResult.Success)
-                                return CreateResponseJson(id, "error", null, $"press failed to focus ref {pressRef}: {clickResult.StdErr}");
+                                return CreateResponseJson(id, "error", null, $"press failed to focus ref {pressRef}: {GetCliErrorMessage(clickResult)}");
                         }
 
-                        var result = await RunCliCommandAsync(sessionName, $"press {key}");
+                        var result = await RunCliCommandAsync(sessionName, $"press {key}", timeoutMs: cmdTimeoutMs);
                         return result.Success
                             ? CreateResponseJson(id, "success", $"Pressed {key}")
-                            : CreateResponseJson(id, "error", null, $"press failed: {result.StdErr}");
+                            : CreateResponseJson(id, "error", null, $"press failed: {GetCliErrorMessage(result)}");
                     }
 
                     case "type":
@@ -848,10 +871,10 @@ namespace foundersharness
                         if (!root.TryGetProperty("text", out var typeTextProp))
                             return CreateResponseJson(id, "error", null, "Missing 'text' parameter for type action.");
                         string typeText = (typeTextProp.GetString() ?? "").Replace("\"", "\\\"");
-                        var result = await RunCliCommandAsync(sessionName, $"type \"{typeText}\"");
+                        var result = await RunCliCommandAsync(sessionName, $"type \"{typeText}\"", timeoutMs: cmdTimeoutMs);
                         return result.Success
                             ? CreateResponseJson(id, "success", "Typed text")
-                            : CreateResponseJson(id, "error", null, $"type failed: {result.StdErr}");
+                            : CreateResponseJson(id, "error", null, $"type failed: {GetCliErrorMessage(result)}");
                     }
 
                     case "screenshot":
@@ -862,9 +885,9 @@ namespace foundersharness
                         if (root.TryGetProperty("ref", out var shotRefProp))
                             cmd = $"screenshot {shotRefProp.GetString()} --filename=\"{screenshotPath}\"";
 
-                        var result = await RunCliCommandAsync(sessionName, cmd);
+                        var result = await RunCliCommandAsync(sessionName, cmd, timeoutMs: cmdTimeoutMs);
                         if (!result.Success)
-                            return CreateResponseJson(id, "error", null, $"screenshot failed: {result.StdErr}");
+                            return CreateResponseJson(id, "error", null, $"screenshot failed: {GetCliErrorMessage(result)}");
 
                         try
                         {
@@ -882,18 +905,18 @@ namespace foundersharness
                         string cmd = "dialog-accept";
                         if (root.TryGetProperty("promptText", out var promptProp))
                             cmd += $" \"{(promptProp.GetString() ?? "").Replace("\"", "\\\"")}\"";
-                        var result = await RunCliCommandAsync(sessionName, cmd);
+                        var result = await RunCliCommandAsync(sessionName, cmd, timeoutMs: cmdTimeoutMs);
                         return result.Success
                             ? CreateResponseJson(id, "success", "Dialog accepted")
-                            : CreateResponseJson(id, "error", null, $"dialog_accept failed: {result.StdErr}");
+                            : CreateResponseJson(id, "error", null, $"dialog_accept failed: {GetCliErrorMessage(result)}");
                     }
 
                     case "dialog_dismiss":
                     {
-                        var result = await RunCliCommandAsync(sessionName, "dialog-dismiss");
+                        var result = await RunCliCommandAsync(sessionName, "dialog-dismiss", timeoutMs: cmdTimeoutMs);
                         return result.Success
                             ? CreateResponseJson(id, "success", "Dialog dismissed")
-                            : CreateResponseJson(id, "error", null, $"dialog_dismiss failed: {result.StdErr}");
+                            : CreateResponseJson(id, "error", null, $"dialog_dismiss failed: {GetCliErrorMessage(result)}");
                     }
 
                     case "eval_ref":
@@ -908,10 +931,10 @@ namespace foundersharness
                         if (root.TryGetProperty("ref", out var evalRefProp))
                             cmd += $" {evalRefProp.GetString()}";
 
-                        var result = await RunCliCommandAsync(sessionName, cmd);
+                        var result = await RunCliCommandAsync(sessionName, cmd, timeoutMs: cmdTimeoutMs);
                         return result.Success
                             ? CreateResponseJson(id, "success", result.StdOut.Trim())
-                            : CreateResponseJson(id, "error", null, $"{action} failed: {result.StdErr}");
+                            : CreateResponseJson(id, "error", null, $"{action} failed: {GetCliErrorMessage(result)}");
                     }
 
                     case "get_text":
@@ -924,38 +947,38 @@ namespace foundersharness
                         string jsExpr = action.ToLower() == "get_text"
                             ? "el => el.textContent ?? ''"
                             : "el => el.value ?? ''";
-                        var result = await RunCliCommandAsync(sessionName, $"eval \"{jsExpr}\" {getRef}");
+                        var result = await RunCliCommandAsync(sessionName, $"eval \"{jsExpr}\" {getRef}", timeoutMs: cmdTimeoutMs);
                         return result.Success
                             ? CreateResponseJson(id, "success", result.StdOut.Trim())
-                            : CreateResponseJson(id, "error", null, $"{action} failed: {result.StdErr}");
+                            : CreateResponseJson(id, "error", null, $"{action} failed: {GetCliErrorMessage(result)}");
                     }
 
                     case "new_page":
                     {
                         string? url = root.TryGetProperty("url", out var newPageUrlProp) ? newPageUrlProp.GetString() : null;
                         string cmd = "tab-new" + (string.IsNullOrEmpty(url) ? "" : $" \"{url}\"");
-                        var result = await RunCliCommandAsync(sessionName, cmd);
+                        var result = await RunCliCommandAsync(sessionName, cmd, timeoutMs: cmdTimeoutMs);
                         return result.Success
                             ? CreateResponseJson(id, "success", "Opened new tab")
-                            : CreateResponseJson(id, "error", null, $"new_page failed: {result.StdErr}");
+                            : CreateResponseJson(id, "error", null, $"new_page failed: {GetCliErrorMessage(result)}");
                     }
 
                     case "close_page":
                     {
                         string? tabIdx = root.TryGetProperty("index", out var idxProp) ? idxProp.GetRawText() : null;
                         string cmd = "tab-close" + (tabIdx == null ? "" : $" {tabIdx}");
-                        var result = await RunCliCommandAsync(sessionName, cmd);
+                        var result = await RunCliCommandAsync(sessionName, cmd, timeoutMs: cmdTimeoutMs);
                         return result.Success
                             ? CreateResponseJson(id, "success", "Closed tab")
-                            : CreateResponseJson(id, "error", null, $"close_page failed: {result.StdErr}");
+                            : CreateResponseJson(id, "error", null, $"close_page failed: {GetCliErrorMessage(result)}");
                     }
 
                     case "active_pages":
                     {
-                        var result = await RunCliCommandAsync(sessionName, "tab-list");
+                        var result = await RunCliCommandAsync(sessionName, "tab-list", timeoutMs: cmdTimeoutMs);
                         return result.Success
                             ? CreateResponseJson(id, "success", result.StdOut.Trim())
-                            : CreateResponseJson(id, "error", null, $"active_pages failed: {result.StdErr}");
+                            : CreateResponseJson(id, "error", null, $"active_pages failed: {GetCliErrorMessage(result)}");
                     }
 
                     case "content":
