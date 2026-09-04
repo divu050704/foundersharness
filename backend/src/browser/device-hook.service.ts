@@ -160,7 +160,7 @@ export class DeviceHookService implements OnModuleInit, OnModuleDestroy {
   async sendCommand(
     action: string,
     params: Record<string, any> = {},
-    timeoutMs = 40000,
+    timeoutMs = 60000,
   ): Promise<any> {
     let ws = this.getActiveFrontendSocket();
     if (!ws) {
@@ -175,11 +175,15 @@ export class DeviceHookService implements OnModuleInit, OnModuleDestroy {
     }
 
     const id = `backend_${Date.now()}_${this.messageIdCounter++}`;
+    const actionLower = action.toLowerCase();
+    const isHeavyAction = ['navigate', 'launch', 'open'].includes(actionLower);
+    const effectiveTimeoutMs = params.timeoutMs || (isHeavyAction ? Math.max(90000, timeoutMs) : timeoutMs);
 
     const payload = {
       id,
       action,
       sessionName: params.sessionName || this.activeSessionName,
+      timeoutMs: effectiveTimeoutMs,
       ...params,
     };
 
@@ -189,11 +193,11 @@ export class DeviceHookService implements OnModuleInit, OnModuleDestroy {
           this.pendingRequests.delete(id);
           reject(
             new Error(
-              `Command '${action}' timed out after ${timeoutMs / 1000} seconds.`,
+              `Command '${action}' timed out after ${effectiveTimeoutMs / 1000} seconds.`,
             ),
           );
         }
-      }, timeoutMs);
+      }, effectiveTimeoutMs);
 
       this.pendingRequests.set(id, {
         resolve: (result) => {

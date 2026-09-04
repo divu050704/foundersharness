@@ -12,7 +12,7 @@ export class UseBrowser {
     private sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
     private model = new ChatGoogleGenerativeAI({
-        model: "gemini-3.5-flash-lite"
+        model: "gemini-3.1-flash-lite"
     })
 
     private dataArrayInterface = z.object({
@@ -100,16 +100,59 @@ export class UseBrowser {
     private navigationModel = this.model.withStructuredOutput(this.navigateOutput)
     private actionModel = this.model.withStructuredOutput(this.actionOutput)
 
-    private navigationNode: GraphNode<typeof this.stateSchema> = async (state) => {
+    private async executeActionWithRetry(
+        actionName: string,
+        params: Record<string, any>,
+        maxRetries = 2
+    ): Promise<boolean> {
+        let retries = 0;
+        let lastError: any = null;
+        while (retries < maxRetries) {
+            try {
+                await this.hookService.sendCommand(actionName, params);
+                return true;
+            } catch (err: any) {
+                retries++;
+                lastError = err;
+                this.logger.warn(`Action '${actionName}' on ref '${params.ref || ""}' failed (attempt ${retries}/${maxRetries}): ${err.message}`);
+                if (retries < maxRetries) {
+                    await this.sleep(1000);
+                }
+            }
+        }
+        this.logger.error(`Action '${actionName}' failed after ${maxRetries} attempts: ${lastError?.message}. Proceeding to next step with fresh snapshot.`);
+        return false;
+    }
 
-        await this.hookService.sendCommand("launch", { sessionName: state.session })
+    private navigationNode: GraphNode<typeof this.stateSchema> = async (state) => {
+        await this.hookService.sendCommand("launch", { sessionName: state.session }, 90000);
         await this.sleep(500);
-        const prompt = `You are an agent which decides the starting point which the browser should open to do the work that the user wants for the query: ${state.query}`
-        const { url } = await this.navigationModel.invoke(prompt)
-        console.log(`-> Navigating to ${url}`)
-        await this.hookService.sendCommand("navigate", { url, sessionName: state.session })
+        const prompt = `You are an agent which decides the starting point which the browser should open to do the work that the user wants for the query: ${state.query}`;
+        const { url } = await this.navigationModel.invoke(prompt);
+        console.log(`-> Navigating to ${url}`);
+
+        let retries = 0;
+        let lastError: any = null;
+        while (retries < 3) {
+            try {
+                await this.hookService.sendCommand("navigate", { url, sessionName: state.session, timeoutMs: 90000 }, 90000);
+                lastError = null;
+                break;
+            } catch (err: any) {
+                retries++;
+                lastError = err;
+                this.logger.warn(`Navigation attempt ${retries}/3 to ${url} failed: ${err.message}`);
+                if (retries < 3) {
+                    await this.sleep(2000);
+                }
+            }
+        }
+        if (lastError) {
+            throw lastError;
+        }
+
         await this.sleep(500);
-        return { url }
+        return { url };
     }
 
     private dataExtractionNode: GraphNode<typeof this.stateSchema> = async (state) => {
@@ -350,47 +393,61 @@ export class UseBrowser {
         switch (action) {
             case "navigate":
                 if (modelOutput.url) {
-                    await this.hookService.sendCommand("navigate", { url: modelOutput.url, sessionName: state.session });
+                    let retries = 0;
+                    let lastErr: any = null;
+                    while (retries < 2) {
+                        try {
+                            await this.hookService.sendCommand("navigate", { url: modelOutput.url, sessionName: state.session, timeoutMs: 90000 }, 90000);
+                            lastErr = null;
+                            break;
+                        } catch (err: any) {
+                            retries++;
+                            lastErr = err;
+                            this.logger.warn(`Navigate action attempt ${retries}/2 failed: ${err.message}`);
+                            if (retries < 2) await this.sleep(2000);
+                        }
+                    }
+                    if (lastErr) throw lastErr;
                     await this.sleep(500);
                 }
                 break;
             case "click_ref":
                 if (modelOutput.ref) {
-                    await this.hookService.sendCommand("click_ref", { ref: modelOutput.ref, sessionName: state.session });
+                    await this.executeActionWithRetry("click_ref", { ref: modelOutput.ref, sessionName: state.session });
                     await this.sleep(500);
                 }
                 break;
             case "fill_ref":
                 if (modelOutput.ref && modelOutput.text) {
-                    await this.hookService.sendCommand("fill_ref", { ref: modelOutput.ref, text: modelOutput.text, sessionName: state.session });
+                    await this.executeActionWithRetry("fill_ref", { ref: modelOutput.ref, text: modelOutput.text, sessionName: state.session });
                     await this.sleep(500);
                 }
                 break;
             case "select_ref":
                 if (modelOutput.ref && modelOutput.value) {
-                    await this.hookService.sendCommand("select_ref", { ref: modelOutput.ref, value: modelOutput.value, sessionName: state.session });
+                    await this.executeActionWithRetry("select_ref", { ref: modelOutput.ref, value: modelOutput.value, sessionName: state.session });
                     await this.sleep(500);
                 }
                 break;
             case "check_ref":
             case "uncheck_ref":
                 if (modelOutput.ref) {
-                    await this.hookService.sendCommand(action, { ref: modelOutput.ref, sessionName: state.session });
+                    await this.executeActionWithRetry(action, { ref: modelOutput.ref, sessionName: state.session });
                     await this.sleep(500);
                 }
                 break;
             case "hover_ref":
                 if (modelOutput.ref) {
-                    await this.hookService.sendCommand("hover_ref", { ref: modelOutput.ref, sessionName: state.session });
+                    await this.executeActionWithRetry("hover_ref", { ref: modelOutput.ref, sessionName: state.session });
                     await this.sleep(500);
                 }
                 break;
             case "dialog_accept":
-                await this.hookService.sendCommand("dialog_accept", { promptText: modelOutput.promptText, sessionName: state.session });
+                await this.executeActionWithRetry("dialog_accept", { promptText: modelOutput.promptText, sessionName: state.session });
                 await this.sleep(500);
                 break;
             case "dialog_dismiss":
-                await this.hookService.sendCommand("dialog_dismiss", { sessionName: state.session });
+                await this.executeActionWithRetry("dialog_dismiss", { sessionName: state.session });
                 await this.sleep(500);
                 break;
             case "finish":

@@ -27,7 +27,7 @@ export class AgentsService {
   ) { }
   private model = new ChatGoogleGenerativeAI({
     apiKey: process.env.GEMINI_API_KEY,
-    model: "gemini-3.5-flash-lite"
+    model: "gemini-3.1-flash-lite"
   })
 
 

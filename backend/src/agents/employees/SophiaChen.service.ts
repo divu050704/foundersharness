@@ -23,7 +23,7 @@ export class SophiaChenService {
   ) {}
 
   private model = new ChatGoogleGenerativeAI({
-    model: "gemini-3.5-flash-lite",
+    model: "gemini-3.1-flash-lite",
   });
 
   createCalendarTool = tool(
@@ -62,25 +62,27 @@ export class SophiaChenService {
     const personality = AGENT_PERSONALITIES["sophia-chen"];
 
     // Save user query in Hindsight only
-    try {
-      if (process.env.HINDSIGHT_URL) {
-        await this.hindsightService.retain(
-          sender,
-          email.content,
-          "User Email Query & Preference for Sophia Chen"
-        );
-      }
-    } catch (e) {
-      this.logger.warn(`Hindsight retain warning: ${e}`);
-    }
+    // try {
+    //   if (process.env.HINDSIGHT_URL) {
+    //     await this.hindsightService.retain(
+    //       sender,
+    //       email.content,
+    //       "User Email Query & Preference for Sophia Chen"
+    //     );
+    //   }
+    // } catch (e) {
+    //   this.logger.warn(`Hindsight retain warning: ${e}`);
+    // }
 
     const userMemories = await this.memory.recall(sender, email.content);
+    // Create a 7-day instagram post calendar
+    // const userMemories = []
     let hindsightMemories: any = null;
-    try {
-      if (process.env.HINDSIGHT_URL) {
-        hindsightMemories = await this.hindsightService.retrieveMemory(sender, email.content);
-      }
-    } catch (_e) {}
+    // try {
+    //   if (process.env.HINDSIGHT_URL) {
+    //     hindsightMemories = await this.hindsightService.retrieveMemory(sender, email.content);
+    //   }
+    // } catch (_e) {}
 
     const prompt = `
       You are Sophia Chen, an AI social media strategist.

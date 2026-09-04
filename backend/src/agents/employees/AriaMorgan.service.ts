@@ -19,7 +19,7 @@ export class AriaMorganService {
   ) {}
 
   private model = new ChatGoogleGenerativeAI({
-    model: "gemini-3.5-flash-lite",
+    model: "gemini-3.1-flash-lite",
   });
 
   auditBudgetTool = tool(
@@ -54,25 +54,25 @@ export class AriaMorganService {
     const personality = AGENT_PERSONALITIES["aria-morgan"];
 
     // Save user query in Hindsight only
-    try {
-      if (process.env.HINDSIGHT_URL) {
-        await this.hindsightService.retain(
-          sender,
-          email.content,
-          "User Email Query & Preference for Aria Morgan"
-        );
-      }
-    } catch (e) {
-      this.logger.warn(`Hindsight retain warning: ${e}`);
-    }
+    // try {
+    //   if (process.env.HINDSIGHT_URL) {
+    //     await this.hindsightService.retain(
+    //       sender,
+    //       email.content,
+    //       "User Email Query & Preference for Aria Morgan"
+    //     );
+    //   }
+    // } catch (e) {
+    //   this.logger.warn(`Hindsight retain warning: ${e}`);
+    // }
 
     const userMemories = await this.memory.recall(sender, email.content);
     let hindsightMemories: any = null;
-    try {
-      if (process.env.HINDSIGHT_URL) {
-        hindsightMemories = await this.hindsightService.retrieveMemory(sender, email.content);
-      }
-    } catch (_e) {}
+    // try {
+    //   if (process.env.HINDSIGHT_URL) {
+    //     hindsightMemories = await this.hindsightService.retrieveMemory(sender, email.content);
+    //   }
+    // } catch (_e) {}
 
     const prompt = `
       You are Aria Morgan, Startup Budget Auditor & API Billing Bot.

@@ -19,7 +19,7 @@ export class TylerReedService {
   ) {}
 
   private model = new ChatGoogleGenerativeAI({
-    model: "gemini-3.5-flash-lite",
+    model: "gemini-3.1-flash-lite",
   });
 
   auditSafetyTool = tool(

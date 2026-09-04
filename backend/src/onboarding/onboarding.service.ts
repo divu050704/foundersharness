@@ -82,7 +82,7 @@ export class OnboardingService {
         let content = "";
         try {
           const model = new ChatGoogleGenerativeAI({
-            model: "gemini-3.5-flash-lite",
+            model: "gemini-3.1-flash-lite",
           });
           const response = await model.invoke(prompt);
           content = typeof response.content === "string" ? response.content : JSON.stringify(response.content);
